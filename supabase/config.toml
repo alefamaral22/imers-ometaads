@@ -1,0 +1,29 @@
+# Supabase local config (SPEC-000 §6). Project ref real fica fora do código (supabase link).
+project_id = "meta-ads-agents"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 16
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[studio]
+enabled = true
+port = 54323
