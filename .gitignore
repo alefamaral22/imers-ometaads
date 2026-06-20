@@ -8,6 +8,9 @@
 .claude/.credentials.json
 .claude/credentials/
 
+# Config pessoal do Claude Code (overrides locais; .claude/settings.json é versionado)
+.claude/settings.local.json
+
 # Config local de MCP (aponta para projeto/refs reais; não versionar)
 .mcp.json
 
