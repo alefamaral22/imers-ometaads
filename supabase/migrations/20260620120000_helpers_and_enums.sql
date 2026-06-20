@@ -8,6 +8,7 @@ create extension if not exists pgcrypto;  -- gen_random_uuid()
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''  -- search_path imutável: só toca NEW, não resolve nomes não qualificados
 as $$
 begin
   new.updated_at := now();
