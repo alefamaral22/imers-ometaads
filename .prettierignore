@@ -1,0 +1,10 @@
+node_modules
+venv
+dist
+.next
+out
+.wrangler
+coverage
+package-lock.json
+pnpm-lock.yaml
+*.md
