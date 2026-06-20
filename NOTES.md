@@ -66,6 +66,36 @@ entre planos; só polling + claim atômico + idempotência.
 - **`.env.example` é espelho exato do `.env.local`** sem valores = contrato canônico (SPEC §2/§7).
   Ao adicionar/editar uma env, **atualizar os dois e `types/env.d.ts`**.
 
+### Decisões da Onda 1 (schema Supabase) — com o porquê
+
+- **Postgres `enum` (não `CHECK`) para domínios fechados** (18 tipos). Porquê: vira contrato validado
+  pelo banco e legível. Trade-off: evoluir um valor exige migration (`ALTER TYPE ... ADD VALUE`).
+- **`bigint` para `*_cents` que acumulam** (spend/value/cpc/cpm/results) e **`integer`** para
+  tetos/preços de campanha (`daily_budget_cap_cents` default 5000). Estimativa de custo de imagem em
+  `numeric` (não é ledger).
+- **`finding_severity` = `positive/info/warning/critical`** — a SPEC §6 não fixou os valores; **estes
+  foram escolhidos por nós**. ⚠️ Código da Onda 4 (analytics) deve usar exatamente estes.
+- **FK on-delete:** hierarquia **cascateia** (campaigns→clients, ad_sets→campaigns, ads→ad_sets,
+  filhos de analyses, sections→landing_pages, narrations→watches); referências **reaproveitáveis** usam
+  **`set null`** (`ads.creative_id`, `creatives.generated_image_id`, `landing_pages.product_id`,
+  `agent_jobs.landing_page_id`, `autonomous_watches.agent_job_id/publish_job_id`).
+- **FK `ads.creative_id` é adicionada na migration de criativos** (não na de `ads`) para evitar
+  dependência circular entre `ads` ↔ `creatives`.
+- **Append-only** (só `created_at`, sem trigger): `analyses` + filhos (`metric_snapshots`,
+  `analysis_findings`, `funnel_events`), `operation_logs`, `agent_events`, `nexus_narrations`, `lp_events`.
+- **Seed via `supabase/seed.sql` + `[db.seed]` no `config.toml`** (não dentro de migration). Roda no
+  `supabase db reset`, idempotente (`on conflict (slug) do nothing`).
+- **RLS deny-by-default = só `ENABLE ROW LEVEL SECURITY`, zero policies.** `service_role` tem `BYPASSRLS`
+  no Supabase → acessa tudo; `anon`/`authenticated` sem policy → leitura vazia. **Toda tabela nova
+  precisa de uma linha em `…120700_rls.sql`.**
+- **Migrations com prefixo timestamp** `20260620HHMMSS_*.sql` (ordem cronológica/lexicográfica). Para
+  adicionar schema, criar nova migration com timestamp **maior** — nunca editar migration já aplicada.
+- **Validador local sem credenciais:** `scripts/_validate_shim.sql` cria `service_role`/`anon`/
+  `authenticated` + schema `storage` num Postgres puro, permitindo aplicar as migrations via Docker
+  efêmero sem o stack Supabase completo. (Não é migration do projeto.)
+- **SPEC-000 corrigido nesta sessão** (mantê-lo "spec-driven sempre atualizado"): §2 ganhou
+  `TELEGRAM_BOT_TOKEN`; árvore §5 ganhou `.claude/rules/`; §8 ganhou ponteiro de status → NOTES.md.
+
 ---
 
 ## 5. Contratos invioláveis (resumo operacional — detalhe em SPEC §6/§10/§11)
@@ -129,16 +159,27 @@ preview · dashboard autentica + Nexus enfileira com confirmação · sem segred
 
 ---
 
-## 8. Próximos passos imediatos (Onda 1 — Supabase)
+## 8. Próximos passos imediatos
 
-1. Garantir **Supabase CLI** instalado + projeto/local stack (preencher `SUPABASE_*`/`DATABASE_URL`).
-2. Escrever `supabase/migrations/*.sql` (ordem cronológica) com **todo o schema de SPEC §6**:
-   tabelas + enums/checks + FKs (on-delete) + índices (inclusive **únicos parciais** de `agent_jobs`)
-   + RLS deny-by-default + trigger `set_updated_at()` + RPCs `claim_agent_job`/`claim_autonomous_watch`
-   (SECURITY DEFINER, `FOR UPDATE SKIP LOCKED`, EXECUTE revogado de anon/authenticated) + buckets
-   (`creatives`/`nexus-review` privados; `landing-assets`/`ad-ingest` públicos) + seed `cliente-exemplo`.
-3. Escrever ADRs: persistência Supabase + fila `agent_jobs`. Spec da feature em `docs/specs/`.
-4. Aceite: `supabase db reset` limpo; select como `service_role` ok e como anon falha; claim atômico; seed presente.
+### 8a. Fechar o aceite da Onda 1 (validação ao vivo — PENDENTE)
+O código da Onda 1 está commitado, mas falta provar `supabase db reset`. Caminho **sem credenciais**
+(preferido): subir o **Docker Desktop** e pedir ao Claude para rodar a validação por Postgres efêmero
++ `scripts/_validate_shim.sql` (aplica todas as migrations + seed e checa: seed presente; claim
+atômico; índice parcial bloqueando duplicata; `anon` sem leitura). Alternativa: instalar **Supabase
+CLI** + preencher `SUPABASE_*`/`DATABASE_URL` e rodar `supabase db reset`.
+
+### 8b. Onda 2 — Runtime de skills + 1ª skill (tráfego)
+1. `lista-de-clientes`, `lista-de-produtos`; briefs em `materiais-das-empresas/<cliente>/produtos/`.
+2. Subagents `scrape-extractor`, `copywriter`, `image-prompt-generator`; skill `image-generate`.
+3. Skill `create-traffic-cliente-exemplo-campaign`: scrape → copy (3 ângulos: autoridade/dor/oferta)
+   → 3 criativos → cria via **MCP da Meta SEMPRE PAUSED** dentro de `daily_budget_cap_cents`; imagem
+   inline em `link_data.picture`; imagem servida do bucket público `ad-ingest`.
+4. **Persistência via REST + `SUPABASE_SECRET_KEY`** (headless **não** usa MCP do Supabase) + manifest
+   JSON em `tentativas-geracao-de-campanhas/<stamp>-<tipo>.json` + `operation_logs` por mutação; idempotente.
+5. Grava em `campaigns/ad_sets/ads/creatives/generated_images/operation_logs` (schema da Onda 1).
+6. **MCP da Meta já conectado nesta sessão** (`mcp__claude_ai_META_ADS__ads_*`) — relevante aqui.
+- **Aceite:** `claude -p ".claude/skills/create-traffic-cliente-exemplo-campaign"` cria campanha PAUSED,
+  grava linhas + manifest; nada fora do teto; re-rodar não duplica gasto.
 
 **Dependências (SPEC §9):** `0→1→2→3→4→5→6→7→8→9/10→11`. 2 e 6 podem paralelizar após 1; 3 precede
 operação real; 6 precede 7; 8 precede 9 e 10.

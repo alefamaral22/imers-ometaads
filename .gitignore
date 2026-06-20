@@ -8,6 +8,9 @@
 .claude/.credentials.json
 .claude/credentials/
 
+# Config local de MCP (aponta para projeto/refs reais; não versionar)
+.mcp.json
+
 # Dependências
 node_modules/
 .pnp

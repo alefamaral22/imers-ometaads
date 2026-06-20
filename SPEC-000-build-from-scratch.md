@@ -55,7 +55,7 @@ Crie estas contas e gere os segredos. Todos vão para `.env.local` (dev) e `fly 
 | **ElevenLabs** | TTS (voz do Nexus) | `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` |
 | **Picovoice** | wake word ("Nexus") | `PICOVOICE_ACCESS_KEY`, `NEXT_PUBLIC_PICOVOICE_ACCESS_KEY` |
 | **Resend** | email do modo autônomo (opcional) | `RESEND_API_KEY`, `AUTONOMOUS_NOTIFY_EMAIL`, `AUTONOMOUS_FROM_EMAIL` |
-| **Telegram** (opcional) | notificação das análises | `TELEGRAM_CHAT_ID` |
+| **Telegram** (opcional) | notificação das análises | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
 | **Meta Marketing API** | criar/ler campanhas | conectada via **MCP `mcp-meta-ads`** (connector da Anthropic), não por env |
 | **Fly.io** | hospedar o runner | conta + `flyctl` |
 | **Vercel** | hospedar o dashboard | conta + projeto |
@@ -125,6 +125,7 @@ funil de conversão (ADR 0025), modo autônomo do Nexus (ADR 0019), tracking ser
 │   ├── skills/                 # skills do Claude Code (uma pasta por skill)
 │   ├── agents/                 # subagents (copywriter, scrape-extractor, image-prompt-generator, ...)
 │   ├── hooks/                  # emit-agent-event.py, remind-update-project-memory.py
+│   ├── rules/                  # regras transversais (security.md, testing.md, code-style.md) — §11
 │   └── materiais-das-empresas/<cliente>/   # logo, fotos, refs, produtos/<slug>.json
 ├── web/                        # dashboard Next.js (Vercel) + Nexus
 ├── packages/lp-render/         # pacote compartilhado de render de landing page (@template/lp-render)
@@ -181,6 +182,10 @@ tudo via `fly secrets`; o dashboard via env do Vercel. Modelos do Nexus configur
 
 > Cada onda é uma vertical slice entregável e testável. Faça commit atômico por onda (Conventional
 > Commits) e só avance com os critérios de aceite verdes.
+>
+> **Status ao vivo do build:** ver `NOTES.md` (registro persistente entre ondas). Concluídas:
+> **Onda 0** (fundações) e **Onda 1** (camada de dados — código; falta validar `supabase db reset`
+> ao vivo). **Próxima: Onda 2.**
 
 ### Onda 0 — Fundações do repositório
 - **Objetivo:** monorepo com tooling, contrato de env e documentação base.
