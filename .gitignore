@@ -1,0 +1,50 @@
+# Segredos — NUNCA commitar
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Credenciais OAuth do Claude Code (runner)
+.claude/.credentials.json
+.claude/credentials/
+
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Python virtualenv (helpers locais)
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Build / output
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+
+# Runtime / logs
+logs/
+*.log
+tentativas-geracao-de-campanhas/
+
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Testes
+coverage/

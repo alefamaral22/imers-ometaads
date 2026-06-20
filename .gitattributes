@@ -1,0 +1,7 @@
+# Normaliza fim de linha: LF no repo para arquivos de texto.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
