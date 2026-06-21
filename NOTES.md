@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas). **Próxima: Onda 7 (Nexus).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat). **Próxima: Onda 9 (editor LP + autônomo).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -272,7 +272,23 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   (RLS fechada ao browser), env validado por Zod, API Hono em `app/api/[[...route]]`.
 - Páginas: overview, analyses, funnel, landing-pages, clients/[slug] (force-dynamic, degradam sem
   banco) + login. `next build` verde (todas as rotas + middleware). ADRs 0005/0006.
-### Onda 7 — Nexus (voz) ⏳
+### Onda 7 — Nexus (voz/chat) ✅ (commit nesta onda)
+- Núcleo puro testável `web/lib/nexus/domain/`: `allowlist` (slug→skill/kind, deny-by-default),
+  `args` (charset restrito anti-shell + `compactArgs`), `confirmation` (dois turnos, token em tempo
+  constante), `enqueue` (linha `agent_jobs`), `tools` (read/write), `prompt`, `memory`, `requests`
+  (Zod). **18 testes** Vitest (rodam pelo root vitest, include `web/**/*.test.ts`).
+- Infra server-only `web/lib/nexus/infra/`: `anthropic` (Messages API via fetch, **sem SDK**),
+  `chat-runner` (dispatch read direto / write propõe / confirm enfileira), `voice` (Whisper/ElevenLabs),
+  `vision` (descrição de tela), `agent-jobs` (enqueue; trata 409 do índice único como "já ativo").
+- API Hono `app/api/[[...route]]`: `POST /nexus/{chat,confirm,stt,tts,capture}` + `GET /nexus/narrations`,
+  protegidos (auth→authz→`limitNexus`→Zod→lógica); degradam 503 sem chaves.
+- UI `web/components/nexus/`: `nexus-widget` (chat + barra Confirmar/Cancelar + push-to-talk),
+  `use-voice` (MediaRecorder→STT, TTS), `visualizer`; ligado ao `Shell`.
+- env (web): CLAUDE/OPENAI/ELEVENLABS_* + NEXUS_MODEL opcionais + flags; `NEXT_PUBLIC_PICOVOICE_ACCESS_KEY`.
+- Docs: SPEC-016, ADR 0010 (enqueue/confirm/allowlist) + 0011 (voz STT/TTS) + 0016 (visão de tela),
+  threat model STRIDE. **Decisão:** Nexus só ENFILEIRA (escrita = agent_jobs pending); runner executa.
+- ⚠️ Não exercitado ao vivo (sem CLAUDE/OPENAI/ELEVENLABS keys); lógica de segurança 100% testada;
+  `next build` verde. Wake-word: push-to-talk nesta onda (Picovoice fica como drop-in futuro).
 ### Onda 8 — Landing pages ✅ (parcial: pacote+template) (commit `8a8c2ba`)
 - `packages/lp-render` (`@template/lp-render`): ContentDoc/Theme/Settings (Zod), **17 seções**,
   serializer puro/determinístico → `content-spec.json`+`messages/pt.json`+`theme.css` (golden tests) +

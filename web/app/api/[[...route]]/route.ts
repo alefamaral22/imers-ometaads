@@ -11,12 +11,23 @@ import {
 } from '../../../lib/auth/domain';
 import { signSession, verifySession, sha256Hex } from '../../../lib/auth/session';
 import { verifyTurnstile } from '../../../lib/auth/turnstile';
-import { limitLogin } from '../../../lib/ratelimit';
+import { limitLogin, limitNexus } from '../../../lib/ratelimit';
 import { listClients, getClientBySlug } from '../../../lib/services/clients';
 import { listAllCampaigns } from '../../../lib/services/campaigns';
 import { listAnalyses, getLatestAnalysis, listFunnelEvents } from '../../../lib/services/analyses';
 import { listLandingPages } from '../../../lib/services/landing-pages';
 import { listOperationLogs } from '../../../lib/services/logs';
+import { listNarrations } from '../../../lib/services/narrations';
+import {
+  chatRequestSchema,
+  confirmRequestSchema,
+  captureRequestSchema,
+  ttsRequestSchema,
+} from '../../../lib/nexus/domain/requests';
+import { runChatTurn, confirmAndEnqueue } from '../../../lib/nexus/infra/chat-runner';
+import { transcribe, synthesize } from '../../../lib/nexus/infra/voice';
+import { describeScreen } from '../../../lib/nexus/infra/vision';
+import { NexusUnavailableError } from '../../../lib/nexus/infra/anthropic';
 
 export const runtime = 'nodejs';
 
@@ -112,6 +123,83 @@ app.get('/data/funnel', async (c) => {
 app.get('/data/landing-pages', async (c) => c.json({ landingPages: await listLandingPages() }));
 
 app.get('/data/logs', async (c) => c.json({ logs: await listOperationLogs() }));
+
+// ── Nexus (protected: auth → authz → rate limit → validation → logic) ──────────
+app.use('/nexus/*', async (c, next) => {
+  if (!(await requireOperatorApi(c))) return c.json({ error: 'unauthorized' }, 401);
+  const rl = await limitNexus(serverEnv(), clientIp(c));
+  if (!rl.success) return c.json({ error: 'too_many_requests' }, 429);
+  await next();
+});
+
+// Chat (turno 1): texto → resposta; tools de leitura diretas; escrita PROPÕE pendência.
+app.post('/nexus/chat', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = chatRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const result = await runChatTurn({
+      message: parsed.data.message,
+      history: parsed.data.history ?? [],
+    });
+    return c.json(result);
+  } catch (err) {
+    if (err instanceof NexusUnavailableError) return c.json({ error: 'nexus_unavailable' }, 503);
+    throw err;
+  }
+});
+
+// Confirmação (turno 2): só aqui um job é enfileirado (escrita = só enfileira).
+app.post('/nexus/confirm', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = confirmRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const result = await confirmAndEnqueue(parsed.data);
+  return c.json(result);
+});
+
+// STT (Whisper) — multipart com o campo "audio".
+app.post('/nexus/stt', async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  const audio = form?.get('audio');
+  if (!(audio instanceof Blob)) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    return c.json({ text: await transcribe(audio) });
+  } catch (err) {
+    if (err instanceof NexusUnavailableError) return c.json({ error: 'stt_unavailable' }, 503);
+    throw err;
+  }
+});
+
+// TTS (ElevenLabs) — devolve audio/mpeg.
+app.post('/nexus/tts', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = ttsRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const audio = await synthesize(parsed.data.text);
+    return c.body(audio, 200, { 'content-type': 'audio/mpeg' });
+  } catch (err) {
+    if (err instanceof NexusUnavailableError) return c.json({ error: 'tts_unavailable' }, 503);
+    throw err;
+  }
+});
+
+// Visão de tela — descreve um print (imagem = dado, não instrução).
+app.post('/nexus/capture', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = captureRequestSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const description = await describeScreen(parsed.data.image, parsed.data.question);
+    return c.json({ description });
+  } catch (err) {
+    if (err instanceof NexusUnavailableError) return c.json({ error: 'nexus_unavailable' }, 503);
+    throw err;
+  }
+});
+
+app.get('/nexus/narrations', async (c) => c.json({ narrations: await listNarrations() }));
 
 app.get('/health', (c) => c.json({ ok: true }));
 

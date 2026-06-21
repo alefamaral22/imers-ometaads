@@ -42,3 +42,30 @@ export async function limitLogin(env: ServerEnv, identifier: string): Promise<Ra
   const { success, remaining, limit } = await rl.limit(identifier);
   return { success, remaining, limit };
 }
+
+let nexusLimiter: Ratelimit | null = null;
+
+function getNexusLimiter(env: ServerEnv): Ratelimit | null {
+  if (!isRateLimitEnabled(env)) return null;
+  if (!nexusLimiter) {
+    const redis = new Redis({
+      url: env.UPSTASH_REDIS_REST_URL as string,
+      token: env.UPSTASH_REDIS_REST_TOKEN as string,
+    });
+    nexusLimiter = new Ratelimit({
+      redis,
+      // 30 requisições por minuto por operador — protege os endpoints de voz/chat do Nexus.
+      limiter: Ratelimit.slidingWindow(30, '60 s'),
+      prefix: 'mdash:nexus',
+      analytics: false,
+    });
+  }
+  return nexusLimiter;
+}
+
+export async function limitNexus(env: ServerEnv, identifier: string): Promise<RateLimitResult> {
+  const rl = getNexusLimiter(env);
+  if (!rl) return ALLOW_ALL;
+  const { success, remaining, limit } = await rl.limit(identifier);
+  return { success, remaining, limit };
+}

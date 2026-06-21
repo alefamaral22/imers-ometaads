@@ -139,6 +139,20 @@ export const dailySummaryRowSchema = z.object({
 });
 export type DailySummaryRow = z.infer<typeof dailySummaryRowSchema>;
 
+// public.nexus_narrations (append-only; falas do Nexus, 1 por tick no modo autônomo — Onda 9)
+export const narrationKind = z.enum(['status', 'opinion', 'system']);
+export const nexusNarrationRowSchema = z.object({
+  id: z.string().uuid(),
+  watch_id: z.string().uuid().nullable(),
+  session_id: z.string().nullable(),
+  text: z.string(),
+  kind: narrationKind,
+  image_path: z.string().nullable(),
+  spoken_at: ts.nullable(),
+  created_at: ts,
+});
+export type NexusNarrationRow = z.infer<typeof nexusNarrationRowSchema>;
+
 /** Parse an array of unknown rows with a row schema; throws on drift. */
 export function parseRows<T>(schema: z.ZodType<T>, rows: unknown[]): T[] {
   return rows.map((row) => schema.parse(row));

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { LogoutButton } from './logout-button';
+import { NexusWidget } from './nexus/nexus-widget';
 
 const NAV = [
   { href: '/', label: 'Visão geral' },
@@ -35,6 +36,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </nav>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <NexusWidget />
     </div>
   );
 }

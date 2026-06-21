@@ -28,11 +28,21 @@ export const serverEnvSchema = z.object({
   // Optional: Upstash rate limiting on the login endpoint.
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().trim().optional(),
+  // Optional: Nexus voice assistant (Onda 7). Each capability degrades to "unavailable" when its
+  // key is absent — the dashboard still builds and runs without them.
+  CLAUDE_API_KEY: z.string().trim().optional(), // chat loop (Anthropic Messages API)
+  OPENAI_API_KEY: z.string().trim().optional(), // STT (Whisper)
+  ELEVENLABS_API_KEY: z.string().trim().optional(), // TTS
+  ELEVENLABS_VOICE_ID: z.string().trim().optional(),
+  NEXUS_MODEL: z.string().trim().optional(), // default no código
+  NEXUS_REVIEW_MODEL: z.string().trim().optional(),
 });
 
 export const publicEnvSchema = z.object({
   // Safe to expose: the Turnstile *site* key is public by design.
   NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY: z.string().trim().optional(),
+  // Safe to expose: Picovoice *access key* for the in-browser wake word (public by design).
+  NEXT_PUBLIC_PICOVOICE_ACCESS_KEY: z.string().trim().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -74,6 +84,23 @@ export function isRateLimitEnabled(
   server: Pick<ServerEnv, 'UPSTASH_REDIS_REST_URL' | 'UPSTASH_REDIS_REST_TOKEN'>,
 ): boolean {
   return Boolean(server.UPSTASH_REDIS_REST_URL && server.UPSTASH_REDIS_REST_TOKEN);
+}
+
+// Nexus capability flags — pure, also covered by tests. Each feature degrades when its key is absent.
+export const NEXUS_DEFAULT_MODEL = 'claude-sonnet-4-6';
+
+export function isNexusChatEnabled(server: Pick<ServerEnv, 'CLAUDE_API_KEY'>): boolean {
+  return Boolean(server.CLAUDE_API_KEY);
+}
+
+export function isSttEnabled(server: Pick<ServerEnv, 'OPENAI_API_KEY'>): boolean {
+  return Boolean(server.OPENAI_API_KEY);
+}
+
+export function isTtsEnabled(
+  server: Pick<ServerEnv, 'ELEVENLABS_API_KEY' | 'ELEVENLABS_VOICE_ID'>,
+): boolean {
+  return Boolean(server.ELEVENLABS_API_KEY && server.ELEVENLABS_VOICE_ID);
 }
 
 let cachedServerEnv: ServerEnv | null = null;
