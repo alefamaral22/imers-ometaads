@@ -14,7 +14,11 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 }
 
 export function CardTitle({ children }: { children: ReactNode }) {
-  return <h3 className="mb-3 text-sm font-medium tracking-wide text-neutral-400 uppercase">{children}</h3>;
+  return (
+    <h3 className="mb-3 text-sm font-medium tracking-wide text-neutral-400 uppercase">
+      {children}
+    </h3>
+  );
 }
 
 export function Stat({ label, value }: { label: string; value: ReactNode }) {
@@ -46,7 +50,9 @@ const STATUS_STYLES: Record<string, string> = {
 export function Badge({ value }: { value: string }) {
   const style = STATUS_STYLES[value] ?? 'bg-neutral-500/15 text-neutral-300 ring-neutral-500/30';
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ring-1 ring-inset ${style}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ring-1 ring-inset ${style}`}
+    >
       {value}
     </span>
   );
@@ -73,9 +79,7 @@ export function Td({ children }: { children: ReactNode }) {
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
-  return (
-    <Card className="text-center text-sm text-neutral-400">{children}</Card>
-  );
+  return <Card className="text-center text-sm text-neutral-400">{children}</Card>;
 }
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {

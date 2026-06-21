@@ -36,7 +36,11 @@ export function optionalString(value: unknown, path: string): string | undefined
   return requireString(value, path, { min: 0 });
 }
 
-export function requireInt(value: unknown, path: string, opts?: { min?: number; max?: number }): number {
+export function requireInt(
+  value: unknown,
+  path: string,
+  opts?: { min?: number; max?: number },
+): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) {
     throw new ValidationError(path, 'expected an integer');
   }
@@ -49,7 +53,11 @@ export function requireInt(value: unknown, path: string, opts?: { min?: number; 
   return value;
 }
 
-export function requireStringArray(value: unknown, path: string, opts?: { min?: number }): string[] {
+export function requireStringArray(
+  value: unknown,
+  path: string,
+  opts?: { min?: number },
+): string[] {
   if (!Array.isArray(value)) throw new ValidationError(path, 'expected an array');
   const min = opts?.min ?? 0;
   if (value.length < min) throw new ValidationError(path, `expected at least ${min} item(s)`);

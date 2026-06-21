@@ -2,7 +2,9 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    // Skills/scripts rodam via tsx (resolve imports .ts). noEmit torna o flag seguro aqui.
+    "allowImportingTsExtensions": true
   },
   "include": ["types/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["node_modules", "venv", "**/dist", "**/.next", "**/out"]

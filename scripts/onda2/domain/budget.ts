@@ -15,7 +15,10 @@ export function clampDailyBudgetCents(requestedCents: number, capCents: number):
     throw new ValidationError('capCents', 'expected a non-negative integer (cents)');
   }
   if (capCents === 0) {
-    throw new ValidationError('capCents', 'daily_budget_cap_cents is 0 — refusing to create a campaign');
+    throw new ValidationError(
+      'capCents',
+      'daily_budget_cap_cents is 0 — refusing to create a campaign',
+    );
   }
   const desired = requestedCents === 0 ? capCents : requestedCents;
   return Math.min(desired, capCents);

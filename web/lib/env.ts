@@ -65,7 +65,9 @@ export function isTurnstileEnabled(
   server: Pick<ServerEnv, 'CLOUDFLARE_TURNSTILE_SECRET_KEY'>,
   pub: Pick<PublicEnv, 'NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY'>,
 ): boolean {
-  return Boolean(server.CLOUDFLARE_TURNSTILE_SECRET_KEY && pub.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY);
+  return Boolean(
+    server.CLOUDFLARE_TURNSTILE_SECRET_KEY && pub.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY,
+  );
 }
 
 export function isRateLimitEnabled(

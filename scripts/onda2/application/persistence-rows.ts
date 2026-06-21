@@ -63,7 +63,11 @@ export interface AdRow {
   raw_spec: unknown;
 }
 
-export function toCampaignRow(plan: CampaignPlan, clientId: string, metaCampaignId: string | null): CampaignRow {
+export function toCampaignRow(
+  plan: CampaignPlan,
+  clientId: string,
+  metaCampaignId: string | null,
+): CampaignRow {
   return {
     client_id: clientId,
     meta_campaign_id: metaCampaignId,
@@ -76,7 +80,11 @@ export function toCampaignRow(plan: CampaignPlan, clientId: string, metaCampaign
   };
 }
 
-export function toAdSetRow(plan: CampaignPlan, campaignId: string, metaAdSetId: string | null): AdSetRow {
+export function toAdSetRow(
+  plan: CampaignPlan,
+  campaignId: string,
+  metaAdSetId: string | null,
+): AdSetRow {
   return {
     campaign_id: campaignId,
     meta_ad_set_id: metaAdSetId,

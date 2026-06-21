@@ -16,9 +16,7 @@ const fontFamily = z
   .regex(/^[\w\s,'"-]+$/, 'invalid font-family');
 
 // A length token: number followed by a CSS unit (px/rem/em/%) — no expressions.
-const cssLength = z
-  .string()
-  .regex(/^\d+(?:\.\d+)?(?:px|rem|em|%)$/, 'invalid CSS length');
+const cssLength = z.string().regex(/^\d+(?:\.\d+)?(?:px|rem|em|%)$/, 'invalid CSS length');
 
 export const themeSchema = z
   .object({

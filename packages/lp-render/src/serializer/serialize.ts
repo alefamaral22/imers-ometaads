@@ -17,7 +17,7 @@ export interface SerializedArtifacts {
 function orderSections(sections: readonly Section[]): Section[] {
   return [...sections]
     .filter((s) => s.enabled)
-    .sort((a, b) => (a.position - b.position) || a.type.localeCompare(b.type));
+    .sort((a, b) => a.position - b.position || a.type.localeCompare(b.type));
 }
 
 // Walk a section's fields and collect every string into the messages bag under "<key>.<path>".

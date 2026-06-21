@@ -54,7 +54,8 @@ export function parseAngledCopy(value: unknown): AdCopy[] {
   for (let i = 0; i < value.length; i++) {
     const item = requireObject(value[i], `copy[${i}]`);
     const angle = requireString(item.angle, `copy[${i}].angle`);
-    if (byAngle.has(angle)) throw new ValidationError(`copy[${i}].angle`, `duplicate angle "${angle}"`);
+    if (byAngle.has(angle))
+      throw new ValidationError(`copy[${i}].angle`, `duplicate angle "${angle}"`);
     byAngle.set(angle, item);
   }
   if (byAngle.size !== COPY_ANGLES.length) {

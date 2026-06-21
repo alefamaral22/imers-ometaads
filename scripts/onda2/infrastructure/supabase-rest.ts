@@ -10,7 +10,9 @@ export interface SupabaseRestConfig {
 }
 
 /** Lê a config do ambiente. Lança se faltar — segredos nunca têm default no código. */
-export function readSupabaseConfigFromEnv(env: NodeJS.ProcessEnv = process.env): SupabaseRestConfig {
+export function readSupabaseConfigFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): SupabaseRestConfig {
   return {
     url: requireString(env.SUPABASE_URL, 'env.SUPABASE_URL'),
     secretKey: requireString(env.SUPABASE_SECRET_KEY, 'env.SUPABASE_SECRET_KEY'),
@@ -19,7 +21,10 @@ export function readSupabaseConfigFromEnv(env: NodeJS.ProcessEnv = process.env):
 
 type FetchLike = typeof fetch;
 
-function restHeaders(cfg: SupabaseRestConfig, extra?: Record<string, string>): Record<string, string> {
+function restHeaders(
+  cfg: SupabaseRestConfig,
+  extra?: Record<string, string>,
+): Record<string, string> {
   return {
     apikey: cfg.secretKey,
     Authorization: `Bearer ${cfg.secretKey}`,

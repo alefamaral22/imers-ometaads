@@ -52,11 +52,7 @@ export const featuresFields = z
   .object({
     headline: text(160),
     features: z
-      .array(
-        z
-          .object({ icon: icon.optional(), title: text(120), description: text(400) })
-          .strict(),
-      )
+      .array(z.object({ icon: icon.optional(), title: text(120), description: text(400) }).strict())
       .min(1)
       .max(24),
   })
@@ -194,7 +190,12 @@ export const urgencyFields = z
   .object({
     headline: text(200),
     // Countdown duration in seconds from first view; client-side only, no server clock.
-    countdownSeconds: z.number().int().positive().max(60 * 60 * 24 * 30).optional(),
+    countdownSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(60 * 60 * 24 * 30)
+      .optional(),
     note: optionalText(280),
   })
   .strict();

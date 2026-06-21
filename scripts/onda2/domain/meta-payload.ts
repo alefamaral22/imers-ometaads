@@ -49,7 +49,10 @@ export interface AdPayload {
   // creative.creative_id é preenchido em runtime após criar o creative.
 }
 
-export function buildCampaignPayload(name: string, specialAdCategories: string[] = []): CampaignPayload {
+export function buildCampaignPayload(
+  name: string,
+  specialAdCategories: string[] = [],
+): CampaignPayload {
   return {
     name,
     objective: TRAFFIC_OBJECTIVE,

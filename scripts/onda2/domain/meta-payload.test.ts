@@ -35,9 +35,9 @@ describe('buildAdSetPayload', () => {
   });
 
   it('refuses to build above the cap', () => {
-    expect(() => buildAdSetPayload({ name: 'AS', requestedDailyBudgetCents: 100, capCents: 0 })).toThrow(
-      ValidationError,
-    );
+    expect(() =>
+      buildAdSetPayload({ name: 'AS', requestedDailyBudgetCents: 100, capCents: 0 }),
+    ).toThrow(ValidationError);
   });
 });
 
