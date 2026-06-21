@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Onda 1 ✅ código escrito e commitado. **Próxima: Onda 2 (skills).** ⚠️ Falta validar `supabase db reset` ao vivo. |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** (lote paralelo via worktrees/agentes, consolidado e verde). **Próxima: Onda 3 (runner Fly).** ⚠️ Falta validar `supabase db reset` ao vivo; skills/dashboard não exercitados ao vivo (credenciais vazias). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -214,13 +214,32 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   - **Validador pronto sem credenciais:** suba o Docker Desktop e eu rodo um Postgres 16 efêmero +
     `scripts/_validate_shim.sql` (cria roles `service_role`/`anon`/`authenticated` + schema `storage`)
     e aplico todas as migrations + seed + checks de aceite. Alternativa: instalar Supabase CLI e preencher `SUPABASE_*`.
-### Onda 2 — Runtime de skills + 1ª skill (tráfego) ⏳
-### Onda 3 — Runner Fly.io ⏳
+### Onda 2 — Runtime de skills + 1ª skill (tráfego) ✅ (commit `aa9a0ab`)
+- Lógica pura testável `scripts/onda2/` (domain/app/infra): ângulos (3: authority/pain/offer),
+  clamp de orçamento ≤ teto, payloads Meta (PAUSED, OUTCOME_TRAFFIC), persistência REST
+  (`upsertRow` merge-duplicates → idempotente; `insertRow` para `operation_logs`), manifest.
+- Skills `.claude/skills/`: `lista-de-clientes`, `lista-de-produtos`, `image-generate`,
+  `create-traffic-cliente-exemplo-campaign` (headless-safe, allowed-tools declaradas, Meta só via MCP).
+- Subagents `.claude/agents/`: `scrape-extractor`, `copywriter`, `image-prompt-generator`
+  (conteúdo externo = dado, não instrução). Brief `curso-exemplo` (ADR 0014). Spec + threat model.
+- ⚠️ Não exercitado ao vivo (sem credenciais Meta/Supabase/OpenAI); lógica coberta por testes Vitest.
+### Onda 3 — Runner Fly.io ⏳ (próxima)
 ### Onda 4 — Analytics (funil + resumo) ⏳
 ### Onda 5 — Ativação + vendas ⏳
-### Onda 6 — Dashboard + auth ⏳
+### Onda 6 — Dashboard + auth ✅ (commit `2c2d8b4`)
+- `web/` Next.js 15 (App Router) + Tailwind: middleware (CSP nonce + headers), auth (senha SHA-256 +
+  cookie JWT + Turnstile opcional), rate limit no login, `lib/services/*` server-side via service_role
+  (RLS fechada ao browser), env validado por Zod, API Hono em `app/api/[[...route]]`.
+- Páginas: overview, analyses, funnel, landing-pages, clients/[slug] (force-dynamic, degradam sem
+  banco) + login. `next build` verde (todas as rotas + middleware). ADRs 0005/0006.
 ### Onda 7 — Nexus (voz) ⏳
-### Onda 8 — Landing pages ⏳
+### Onda 8 — Landing pages ✅ (parcial: pacote+template) (commit `8a8c2ba`)
+- `packages/lp-render` (`@template/lp-render`): ContentDoc/Theme/Settings (Zod), **17 seções**,
+  serializer puro/determinístico → `content-spec.json`+`messages/pt.json`+`theme.css` (golden tests) +
+  CLI `tsx`, libs (checkout/utm/consent/affiliate).
+- `landing-pages/_template`: Next.js `output:export`, 17 renderizadores, consome `generated/`,
+  `next build` verde (out/ estático). ADRs 0012/0013/0015/0017 + SPEC-011.
+- ⏳ Resta (continuação da Onda 8): skills `create/publish-landing-page-<cliente>` (runner/Cloudflare).
 ### Onda 9 — Editor LP + modo autônomo ⏳
 ### Onda 10 — Tracking (Worker) ⏳
 ### Onda 11 — Hardening + CI/CD ⏳

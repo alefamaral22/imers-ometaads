@@ -184,8 +184,11 @@ tudo via `fly secrets`; o dashboard via env do Vercel. Modelos do Nexus configur
 > Commits) e só avance com os critérios de aceite verdes.
 >
 > **Status ao vivo do build:** ver `NOTES.md` (registro persistente entre ondas). Concluídas:
-> **Onda 0** (fundações) e **Onda 1** (camada de dados — código; falta validar `supabase db reset`
-> ao vivo). **Próxima: Onda 2.**
+> **Onda 0** (fundações), **Onda 1** (dados — código), e o lote paralelo **Ondas 2, 6 e 8**
+> (skills+tráfego, dashboard+auth, e o pacote `@template/lp-render`+template — feitas em worktrees
+> e consolidadas com gates+builds verdes). **Próxima: Onda 3 (runner Fly).** Pendências: validar
+> `supabase db reset` ao vivo; exercitar skills/dashboard com credenciais reais; skills de
+> create/publish de LP (continuação da Onda 8).
 
 ### Onda 0 — Fundações do repositório
 - **Objetivo:** monorepo com tooling, contrato de env e documentação base.
