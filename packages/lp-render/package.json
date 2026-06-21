@@ -1,0 +1,28 @@
+{
+  "name": "@template/lp-render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Render package: turns the Supabase-persisted ContentDoc into landing-page build artifacts (messages/pt.json, content-spec.json, theme.css) + shared LP libs (checkout, affiliate, utm, consent). SPEC-000 §8 Onda 8 / §10.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./serializer": "./src/serializer/index.ts",
+    "./sections": "./src/sections/index.ts",
+    "./theme": "./src/theme/index.ts",
+    "./lib/checkout": "./src/lib/checkout.ts",
+    "./lib/affiliate": "./src/lib/affiliate.ts",
+    "./lib/utm": "./src/lib/utm.ts",
+    "./lib/consent": "./src/lib/consent.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "serialize": "tsx src/serializer/cli.ts"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
