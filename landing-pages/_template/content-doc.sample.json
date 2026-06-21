@@ -1,0 +1,193 @@
+{
+  "settings": {
+    "subdomain": "curso-exemplo",
+    "locale": "pt",
+    "noindex": true,
+    "checkoutUrl": "https://pay.example.com/curso-exemplo",
+    "priceCents": 19700,
+    "currency": "BRL",
+    "cartState": "open",
+    "affiliateEnabled": true,
+    "consentRequired": true,
+    "utmDefaults": { "source": "facebook", "medium": "paid" },
+    "tracking": { "metaPixelId": "123456789012345" }
+  },
+  "theme": {
+    "colors": {
+      "primary": "#2563eb",
+      "primaryForeground": "#ffffff",
+      "secondary": "#1e293b",
+      "accent": "#f59e0b",
+      "background": "#ffffff",
+      "foreground": "#0f172a",
+      "muted": "#64748b",
+      "border": "#e2e8f0",
+      "success": "#16a34a",
+      "destructive": "#dc2626"
+    },
+    "fonts": {
+      "heading": "'Inter', system-ui, sans-serif",
+      "body": "'Inter', system-ui, sans-serif"
+    },
+    "radius": "12px",
+    "maxWidth": "1200px"
+  },
+  "sections": [
+    {
+      "type": "hero",
+      "position": 0,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "eyebrow": "Curso Exemplo",
+        "headline": "Aprenda a gerar tráfego que converte",
+        "subheadline": "Método validado em centenas de campanhas reais.",
+        "cta": { "label": "Quero começar agora", "action": "checkout" }
+      }
+    },
+    {
+      "type": "problem",
+      "position": 1,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Cansado de queimar verba sem resultado?",
+        "items": [
+          { "icon": "bolt", "text": "Campanhas que gastam e não vendem." },
+          { "icon": "clock", "text": "Horas perdidas testando sem método." }
+        ]
+      }
+    },
+    {
+      "type": "features",
+      "position": 2,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "O que você recebe",
+        "features": [
+          { "icon": "check", "title": "Aulas práticas", "description": "Passo a passo aplicável hoje." },
+          { "icon": "bolt", "title": "Templates prontos", "description": "Copie, cole e publique." },
+          { "icon": "trophy", "title": "Bônus exclusivos", "description": "Materiais de apoio premium." }
+        ]
+      }
+    },
+    {
+      "type": "benefits",
+      "position": 3,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Resultados que você leva",
+        "benefits": [
+          { "icon": "star", "text": "ROI previsível mês a mês." },
+          { "icon": "shield", "text": "Confiança para escalar." }
+        ]
+      }
+    },
+    {
+      "type": "how_it_works",
+      "position": 4,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Como funciona",
+        "steps": [
+          { "title": "Diagnóstico", "description": "Mapeamos sua oferta e público." },
+          { "title": "Estrutura", "description": "Montamos campanhas com método." },
+          { "title": "Escala", "description": "Otimizamos com base em dados." }
+        ]
+      }
+    },
+    {
+      "type": "testimonials",
+      "position": 5,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Quem aplicou, aprova",
+        "testimonials": [
+          { "quote": "Triplicamos as vendas em 60 dias.", "author": "Ana Souza", "role": "Infoprodutora" },
+          { "quote": "Finalmente um método claro.", "author": "Carlos Lima", "role": "E-commerce" }
+        ]
+      }
+    },
+    {
+      "type": "offer",
+      "position": 6,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Tudo o que está incluso",
+        "valueItems": [
+          { "label": "Curso completo", "valueCents": 49700 },
+          { "label": "Templates de campanha", "valueCents": 19700 },
+          { "label": "Comunidade", "valueCents": 9700 }
+        ],
+        "anchorPriceCents": 79100,
+        "priceCents": 19700,
+        "cta": { "label": "Garantir minha vaga", "action": "checkout" }
+      }
+    },
+    {
+      "type": "guarantee",
+      "position": 7,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Garantia incondicional de 7 dias",
+        "body": "Se não fizer sentido para você, devolvemos 100% do valor. Sem perguntas."
+      }
+    },
+    {
+      "type": "faq",
+      "position": 8,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Perguntas frequentes",
+        "items": [
+          { "question": "Funciona para iniciantes?", "answer": "Sim, começamos do zero." },
+          { "question": "Tenho acesso por quanto tempo?", "answer": "Acesso vitalício ao conteúdo." }
+        ]
+      }
+    },
+    {
+      "type": "lead_form",
+      "position": 9,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "Receba uma aula gratuita",
+        "submitLabel": "Quero a aula",
+        "collectEmail": true,
+        "collectPhone": false,
+        "consentText": "Concordo em receber comunicações."
+      }
+    },
+    {
+      "type": "urgency",
+      "position": 10,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "headline": "As vagas com bônus encerram em breve",
+        "countdownSeconds": 86400,
+        "note": "Oferta por tempo limitado."
+      }
+    },
+    {
+      "type": "footer",
+      "position": 11,
+      "enabled": true,
+      "version": 1,
+      "fields": {
+        "copyright": "© 2026 Acme",
+        "links": [
+          { "label": "Privacidade", "href": "/privacidade" },
+          { "label": "Termos", "href": "/termos" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@template/lp-template",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Next.js static-export template for a single landing page. Renders from the generated/ artifacts emitted by @template/lp-render (content-spec.json + messages/pt.json + theme.css). Cloned per LP and deployed to Cloudflare Pages <subdomain>.example.com. SPEC-000 §8 Onda 8.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "serialize": "tsx ../../packages/lp-render/src/serializer/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "next": "15.1.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
