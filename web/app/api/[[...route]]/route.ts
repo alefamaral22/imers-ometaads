@@ -1,0 +1,119 @@
+import { Hono } from 'hono';
+import { handle } from 'hono/vercel';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { serverEnv, isTurnstileEnabled, publicEnv } from '../../../lib/env';
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_TTL_SECONDS,
+  isAuthorizedOperator,
+  loginInputSchema,
+  passwordMatches,
+} from '../../../lib/auth/domain';
+import { signSession, verifySession, sha256Hex } from '../../../lib/auth/session';
+import { verifyTurnstile } from '../../../lib/auth/turnstile';
+import { limitLogin } from '../../../lib/ratelimit';
+import { listClients, getClientBySlug } from '../../../lib/services/clients';
+import { listAllCampaigns } from '../../../lib/services/campaigns';
+import { listAnalyses, getLatestAnalysis, listFunnelEvents } from '../../../lib/services/analyses';
+import { listLandingPages } from '../../../lib/services/landing-pages';
+import { listOperationLogs } from '../../../lib/services/logs';
+
+export const runtime = 'nodejs';
+
+const app = new Hono().basePath('/api');
+
+/** Authz middleware for protected API routes: verify cookie -> require operator role. */
+async function requireOperatorApi(c: Parameters<Parameters<typeof app.use>[1]>[0]) {
+  const token = getCookie(c, SESSION_COOKIE_NAME);
+  const claims = await verifySession(token, serverEnv().AUTH_SECRET);
+  return isAuthorizedOperator(claims);
+}
+
+function clientIp(c: { req: { header: (n: string) => string | undefined } }): string {
+  const fwd = c.req.header('x-forwarded-for');
+  return fwd?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown';
+}
+
+// ── Auth (public) ────────────────────────────────────────────────────────────
+app.post('/auth/login', async (c) => {
+  const env = serverEnv();
+
+  // 1) rate limit (public endpoint) — before any expensive work.
+  const ip = clientIp(c);
+  const rl = await limitLogin(env, ip);
+  if (!rl.success) {
+    return c.json({ error: 'too_many_requests' }, 429);
+  }
+
+  // 2) validation: external input is data, not instruction.
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = loginInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+
+  // 3) optional Turnstile (bot protection).
+  if (isTurnstileEnabled(env, publicEnv())) {
+    const ok = await verifyTurnstile(
+      env.CLOUDFLARE_TURNSTILE_SECRET_KEY as string,
+      parsed.data.turnstileToken,
+      ip,
+    );
+    if (!ok) return c.json({ error: 'turnstile_failed' }, 403);
+  }
+
+  // 4) logic: compare SHA-256 of the submitted password to the configured digest.
+  const submittedDigest = await sha256Hex(parsed.data.password);
+  if (!passwordMatches(submittedDigest, env.DASHBOARD_PASSWORD)) {
+    return c.json({ error: 'invalid_credentials' }, 401);
+  }
+
+  const token = await signSession(env.AUTH_SECRET);
+  setCookie(c, SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax',
+    path: '/',
+    maxAge: SESSION_TTL_SECONDS,
+  });
+  return c.json({ ok: true });
+});
+
+app.post('/auth/logout', (c) => {
+  deleteCookie(c, SESSION_COOKIE_NAME, { path: '/' });
+  return c.json({ ok: true });
+});
+
+// ── Protected reads ──────────────────────────────────────────────────────────
+app.use('/data/*', async (c, next) => {
+  if (!(await requireOperatorApi(c))) return c.json({ error: 'unauthorized' }, 401);
+  await next();
+});
+
+app.get('/data/clients', async (c) => c.json({ clients: await listClients() }));
+
+app.get('/data/clients/:slug', async (c) => {
+  const slug = c.req.param('slug');
+  const client = await getClientBySlug(slug);
+  if (!client) return c.json({ error: 'not_found' }, 404);
+  return c.json({ client });
+});
+
+app.get('/data/campaigns', async (c) => c.json({ campaigns: await listAllCampaigns() }));
+
+app.get('/data/analyses', async (c) => c.json({ analyses: await listAnalyses() }));
+
+app.get('/data/funnel', async (c) => {
+  const latest = await getLatestAnalysis();
+  if (!latest) return c.json({ analysis: null, events: [] });
+  return c.json({ analysis: latest, events: await listFunnelEvents(latest.id) });
+});
+
+app.get('/data/landing-pages', async (c) => c.json({ landingPages: await listLandingPages() }));
+
+app.get('/data/logs', async (c) => c.json({ logs: await listOperationLogs() }));
+
+app.get('/health', (c) => c.json({ ok: true }));
+
+export const GET = handle(app);
+export const POST = handle(app);
