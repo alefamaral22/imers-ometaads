@@ -1,0 +1,16 @@
+{
+  "slug": "curso-exemplo",
+  "name": "Curso Exemplo de Tráfego",
+  "audience": "Infoprodutores e pequenos negócios que querem escalar vendas com Meta Ads sem depender de agência.",
+  "valueProps": [
+    "Método validado em centenas de campanhas reais",
+    "Templates de campanha prontos para copiar e publicar",
+    "Acompanhamento da estrutura conta → campanha → conjunto → anúncio",
+    "Comunidade e bônus de apoio"
+  ],
+  "tone": "direto, confiante e prático, sem jargão vazio",
+  "landingUrl": "https://curso-exemplo.example.com",
+  "priceCents": 19700,
+  "currency": "BRL",
+  "defaultSubdomain": "curso-exemplo"
+}
