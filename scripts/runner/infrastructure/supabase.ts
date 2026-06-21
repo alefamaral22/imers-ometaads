@@ -46,9 +46,11 @@ export async function claimAgentJob(
   if (!res.ok) {
     throw new RunnerError(`claim_agent_job failed (${res.status}): ${await res.text()}`);
   }
-  // A função SQL retorna a linha (objeto) ou null quando não há job pendente.
+  // A função SQL retorna a linha (objeto) ou null quando não há job pendente. Dependendo da versão
+  // do PostgREST, um composite pode vir como objeto OU como array de um elemento — tolera ambos.
   const json: unknown = await res.json();
-  return parseClaimedJob(json);
+  const row = Array.isArray(json) ? (json[0] ?? null) : json;
+  return parseClaimedJob(row);
 }
 
 /** PATCH parcial de um job por id. */

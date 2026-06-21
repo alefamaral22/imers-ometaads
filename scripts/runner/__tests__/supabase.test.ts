@@ -68,6 +68,13 @@ describe('claimAgentJob', () => {
     expect(await claimAgentJob(cfg, fn)).toBeNull();
   });
 
+  it('tolerates an array-wrapped composite (PostgREST version differences)', async () => {
+    const wrapped = fakeFetch([{ id: 'job-2', skill: 'lista-de-clientes', kind: 'analyze' }]);
+    expect((await claimAgentJob(cfg, wrapped.fn))?.id).toBe('job-2');
+    const empty = fakeFetch([]);
+    expect(await claimAgentJob(cfg, empty.fn)).toBeNull();
+  });
+
   it('throws on a non-ok response', async () => {
     const { fn } = fakeFetch({ message: 'denied' }, { ok: false, status: 403 });
     await expect(claimAgentJob(cfg, fn)).rejects.toThrow(RunnerError);
