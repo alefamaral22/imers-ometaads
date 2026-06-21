@@ -1,0 +1,8 @@
+# Onda 3 — crontab do runner (lido pelo supercronic no Fly.io). Formato cron padrão de 5 campos.
+# Horários em UTC (TZ=UTC no fly.toml). Cada linha redireciona para um log em /app/logs.
+
+# Fila: processa no máximo 1 job por minuto (lock + claim atômico em poll-agent-jobs.sh).
+* * * * * bash /app/scripts/poll-agent-jobs.sh >> /app/logs/poll.log 2>&1
+
+# Skill de tráfego agendada — aceite da Onda 3: "cron dispara a skill da Onda 2". Diária às 09:00 UTC.
+0 9 * * * bash /app/scripts/run-skill.sh create-traffic-cliente-exemplo-campaign >> /app/logs/cron.log 2>&1
