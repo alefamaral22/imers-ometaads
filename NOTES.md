@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** (lote paralelo via worktrees/agentes, consolidado e verde). **Próxima: Onda 3 (runner Fly).** ⚠️ Falta validar `supabase db reset` ao vivo; skills/dashboard não exercitados ao vivo (credenciais vazias). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly). **Próxima: Onda 4 (analytics).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -223,7 +223,21 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - Subagents `.claude/agents/`: `scrape-extractor`, `copywriter`, `image-prompt-generator`
   (conteúdo externo = dado, não instrução). Brief `curso-exemplo` (ADR 0014). Spec + threat model.
 - ⚠️ Não exercitado ao vivo (sem credenciais Meta/Supabase/OpenAI); lógica coberta por testes Vitest.
-### Onda 3 — Runner Fly.io ⏳ (próxima)
+### Onda 3 — Runner Fly.io ✅ (commit `7fc7cfd`)
+- Infra: `Dockerfile` (node:22 + supercronic + Claude Code CLI + wrangler + tsx + python3 + tini),
+  `fly.toml` (app `meta-ads-agents`, gru, **sem HTTP inbound**, volume `claude_oauth` p/ OAuth),
+  `crontab` (poll 1/min + skill de tráfego diária 09:00 UTC).
+- Bash fino: `scripts/poll-agent-jobs.sh` (lock `mkdir` + `trap`), `scripts/run-skill.sh`
+  (`claude -p ... stream-json` | `tee` log | `emit-from-stream.ts`).
+- **Lógica em TS testável** `scripts/runner/`: claim atômico via RPC `claim_agent_job`, validação de
+  skill (allowlist on-disk) + args (charset seguro anti-shell), transições
+  pending→running→completed/failed, mapeamento stream-json→`agent_events` (PII-safe), bookends
+  start/end garantidos. **30 testes** (domain + infra com `fetch` fake).
+- Hook opcional `emit-agent-event.py` (Python stdlib, self-guarding, opt-in `RUNNER_HOOKS=1`) +
+  `.claude/runner-settings.json`. ADR 0001 + SPEC flyio-cron-campaign-runner + threat model STRIDE.
+- **Decisão:** runner é TS-first (não Python) para ter cobertura no gate; documentado no ADR 0001.
+- ⚠️ Não exercitado ao vivo: sem `docker build`/deploy Fly e sem credenciais. `bash -n` ok nos scripts;
+  lógica coberta por testes. Validação real: `fly deploy` + inserir job em `agent_jobs` → ver `completed`.
 ### Onda 4 — Analytics (funil + resumo) ⏳
 ### Onda 5 — Ativação + vendas ⏳
 ### Onda 6 — Dashboard + auth ✅ (commit `2c2d8b4`)
