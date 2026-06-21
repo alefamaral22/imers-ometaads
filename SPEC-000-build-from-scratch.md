@@ -186,9 +186,10 @@ tudo via `fly secrets`; o dashboard via env do Vercel. Modelos do Nexus configur
 > **Status ao vivo do build:** ver `NOTES.md` (registro persistente entre ondas). Concluídas:
 > **Onda 0** (fundações), **Onda 1** (dados — código), o lote paralelo **Ondas 2, 6 e 8**
 > (skills+tráfego, dashboard+auth, pacote `@template/lp-render`+template), **Onda 3** (runner Fly:
-> supercronic + fila `agent_jobs`, lógica TS testável) e **Onda 4** (analytics: funil de 7 etapas +
-> diagnóstico read-only + resumo diário). Tudo com gates+builds verdes.
-> **Próxima: Onda 5 (ativação + vendas).** Pendências: validar `supabase db reset` ao vivo; exercitar
+> supercronic + fila `agent_jobs`, lógica TS testável), **Onda 4** (analytics: funil de 7 etapas +
+> diagnóstico read-only + resumo diário) e **Onda 5** (ativação default-deny + campanha de vendas
+> OUTCOME_SALES reusando top criativos). Tudo com gates+builds verdes.
+> **Próxima: Onda 7 (Nexus — voz).** Pendências: validar `supabase db reset` ao vivo; exercitar
 > runner/skills/dashboard com credenciais reais (`fly deploy`); skills create/publish de LP (cont. Onda 8).
 
 ### Onda 0 — Fundações do repositório

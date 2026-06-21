@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics). **Próxima: Onda 5 (ativação + vendas).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas). **Próxima: Onda 7 (Nexus).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -251,7 +251,21 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   (upsert idempotente; Telegram opcional log-only). Crons 10:00 e 10:30 UTC no `crontab`.
 - Docs: spec `meta-ads-funnel-analytics`, ADR 0025 (funil) + 0024 (análise diária), threat model STRIDE.
 - ⚠️ Não exercitado ao vivo (sem credenciais Meta/Supabase); lógica coberta por testes determinísticos.
-### Onda 5 — Ativação + vendas ⏳
+### Onda 5 — Ativação + campanha de vendas ✅ (commit nesta onda)
+- Lógica pura testável `scripts/onda5/` (domain/app/infra): `evaluateActivation` (**default-deny**:
+  right_client/has_meta_id/currently_paused/cap_positive/has_entities/budget_within_cap — aborta na
+  dúvida), payloads OUTCOME_SALES (`buildSalesAdSetPayload` **omite destination_type** v25, pixel
+  PURCHASE, OFFSITE_CONVERSIONS), `selectTopCreatives` (por compras→gasto, só reutilizáveis),
+  `buildSalesPlan` (reusa criativos, clampa teto). **24 testes** Vitest.
+- Infra `meta-rest.ts`: `patchById` (status PAUSED→ACTIVE no banco). Vendas reusa `upsertRow`/`insertRow`
+  da Onda 2. REST + `SUPABASE_SECRET_KEY`, nunca MCP do Supabase.
+- Skills `.claude/skills/`: `activate-campaign-cliente-exemplo` (least privilege: só
+  `ads_activate_entity`/`ads_update_entity`; lê estado do banco e revalida) e
+  `create-sales-cliente-exemplo-campaign` (OUTCOME_SALES PAUSED, reuso, idempotente). **Operador-triggered,
+  não cron** (ativação = gasto real, confirmação no Nexus/Onda 7).
+- Docs: spec `meta-ads-activation-and-sales`, ADR 0007 (ativação default-deny) + 0008 (vendas reusa),
+  threat model STRIDE.
+- ⚠️ Não exercitado ao vivo (sem credenciais Meta/Supabase); lógica coberta por testes determinísticos.
 ### Onda 6 — Dashboard + auth ✅ (commit `2c2d8b4`)
 - `web/` Next.js 15 (App Router) + Tailwind: middleware (CSP nonce + headers), auth (senha SHA-256 +
   cookie JWT + Turnstile opcional), rate limit no login, `lib/services/*` server-side via service_role
