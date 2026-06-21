@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly). **Próxima: Onda 4 (analytics).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics). **Próxima: Onda 5 (ativação + vendas).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -238,7 +238,19 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - **Decisão:** runner é TS-first (não Python) para ter cobertura no gate; documentado no ADR 0001.
 - ⚠️ Não exercitado ao vivo: sem `docker build`/deploy Fly e sem credenciais. `bash -n` ok nos scripts;
   lógica coberta por testes. Validação real: `fly deploy` + inserir job em `agent_jobs` → ver `completed`.
-### Onda 4 — Analytics (funil + resumo) ⏳
+### Onda 4 — Analytics (funil + resumo diário) ✅ (commit nesta onda)
+- Lógica pura testável `scripts/onda4/` (domain/app/infra): funil de 7 etapas (`computeFunnel`: CVR
+  from_prev/from_top, custo por evento, divisão-por-zero→null), snapshot de métricas (`buildSnapshot`:
+  currency→cents, ctr/cpc/cpm derivados, "sem dado"=null), diagnóstico (`diagnose` cruza ≥2 métricas
+  ancorado no north-star; `overallVerdict`), plano de análise + resumo diário (ROAS, vereditos).
+  **37 testes** Vitest.
+- Infra `analytics-rest.ts`: `insertReturning` (id de `analyses`) + `insertMany` (filhos append-only em
+  lote) — reusa `readSupabaseConfigFromEnv` da Onda 2; REST + `SUPABASE_SECRET_KEY`, nunca MCP do Supabase.
+- Skills `.claude/skills/`: `funnel-analytics-cliente-exemplo-campaign` (**read-only na Meta** —
+  allowed-tools só `ads_get_*`/`ads_insights_*`, zero writes) e `daily-summary-cliente-exemplo`
+  (upsert idempotente; Telegram opcional log-only). Crons 10:00 e 10:30 UTC no `crontab`.
+- Docs: spec `meta-ads-funnel-analytics`, ADR 0025 (funil) + 0024 (análise diária), threat model STRIDE.
+- ⚠️ Não exercitado ao vivo (sem credenciais Meta/Supabase); lógica coberta por testes determinísticos.
 ### Onda 5 — Ativação + vendas ⏳
 ### Onda 6 — Dashboard + auth ✅ (commit `2c2d8b4`)
 - `web/` Next.js 15 (App Router) + Tailwind: middleware (CSP nonce + headers), auth (senha SHA-256 +

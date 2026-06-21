@@ -6,3 +6,9 @@
 
 # Skill de tráfego agendada — aceite da Onda 3: "cron dispara a skill da Onda 2". Diária às 09:00 UTC.
 0 9 * * * bash /app/scripts/run-skill.sh create-traffic-cliente-exemplo-campaign >> /app/logs/cron.log 2>&1
+
+# Onda 4 — Analytics read-only: extrai o funil + diagnóstico do período anterior. Diária às 10:00 UTC.
+0 10 * * * bash /app/scripts/run-skill.sh funnel-analytics-cliente-exemplo-campaign >> /app/logs/cron.log 2>&1
+
+# Onda 4 — Resumo diário: agrega as analyses do dia (depende da análise acima). Diária às 10:30 UTC.
+30 10 * * * bash /app/scripts/run-skill.sh daily-summary-cliente-exemplo >> /app/logs/cron.log 2>&1
