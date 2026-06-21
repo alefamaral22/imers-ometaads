@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6, 8 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat). **Próxima: Onda 9 (editor LP + autônomo).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo). **Próxima: Onda 10 (tracking Worker).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -289,13 +289,29 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   threat model STRIDE. **Decisão:** Nexus só ENFILEIRA (escrita = agent_jobs pending); runner executa.
 - ⚠️ Não exercitado ao vivo (sem CLAUDE/OPENAI/ELEVENLABS keys); lógica de segurança 100% testada;
   `next build` verde. Wake-word: push-to-talk nesta onda (Picovoice fica como drop-in futuro).
-### Onda 8 — Landing pages ✅ (parcial: pacote+template) (commit `8a8c2ba`)
+### Onda 8 — Landing pages ✅ (completa: pacote+template+skills) (commits `8a8c2ba` + cont. nesta onda)
 - `packages/lp-render` (`@template/lp-render`): ContentDoc/Theme/Settings (Zod), **17 seções**,
   serializer puro/determinístico → `content-spec.json`+`messages/pt.json`+`theme.css` (golden tests) +
   CLI `tsx`, libs (checkout/utm/consent/affiliate).
 - `landing-pages/_template`: Next.js `output:export`, 17 renderizadores, consome `generated/`,
   `next build` verde (out/ estático). ADRs 0012/0013/0015/0017 + SPEC-011.
-- ⏳ Resta (continuação da Onda 8): skills `create/publish-landing-page-<cliente>` (runner/Cloudflare).
-### Onda 9 — Editor LP + modo autônomo ⏳
+- ✅ **Continuação (nesta sessão, junto da Onda 9):** `scripts/onda8/` (invariantes do rascunho +
+  linhas de persistência + `assembleContentDoc`/`publishPatch`; 12 testes); subagents
+  `landing-page-architect`/`lp-copywriter`; skills `create-landing-page-cliente-exemplo` (rascunho
+  noindex + enfileira `landing_publish`) e `publish-landing-page-cliente-exemplo` (serializa do banco →
+  `next build` → wrangler Pages deploy).
+### Onda 9 — Editor de landing + modo autônomo do Nexus ✅ (commit nesta onda)
+- Editor (web): `lib/landing/edit.ts` (edit-path anti prototype-pollution, `reconcile` por versão,
+  schemas Zod; 5 testes); serviços `landing-sections` (edição síncrona com concorrência otimista) e
+  `watches`; API `POST /api/landing/{section,autonomous}` (protegidos); `components/landing/section-editor`
+  + rota `app/landing-pages/[id]`. Helper `patchRows` no db client.
+- Autônomo (runner): `scripts/onda9/` máquina de fases `watching→reviewing→notifying→done` (`tickWatch`
+  ≤1 narração/tick, idempotente por cursores) + `planTick`; 8 testes. Infra `runner/infrastructure/watches.ts`
+  + `runner/poll-watch-once.ts` (mecânico, sem LLM); skill `autonomous-watch-tick`;
+  `scripts/poll-autonomous-watches.sh`; cron 1/min no `crontab`.
+- Live review: `scripts/screenshot-page.cjs` (Playwright, **SSRF-guard** `*.example.com`),
+  `scripts/send-email.cjs` (Resend, **fail-safe** log-only).
+- Docs: spec landing-editor-and-autonomous, ADR 0019 (modo autônomo) + 0020 (live review), threat model.
+- ⚠️ Não exercitado ao vivo (sem credenciais/Playwright/Resend); lógica de decisão 100% testada.
 ### Onda 10 — Tracking (Worker) ⏳
 ### Onda 11 — Hardening + CI/CD ⏳

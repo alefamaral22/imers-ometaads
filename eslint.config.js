@@ -26,5 +26,25 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
+  {
+    // Scripts auxiliares do runner em CommonJS Node (screenshot/email — Onda 9). Globals do Node.
+    files: ['**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        module: 'writable',
+        require: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        __dirname: 'readonly',
+      },
+    },
+    rules: {
+      // require() é o mecanismo correto em CommonJS (e o require lazy de playwright é proposital).
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
   prettier,
 );

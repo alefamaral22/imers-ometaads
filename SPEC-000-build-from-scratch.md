@@ -188,10 +188,12 @@ tudo via `fly secrets`; o dashboard via env do Vercel. Modelos do Nexus configur
 > (skills+tráfego, dashboard+auth, pacote `@template/lp-render`+template), **Onda 3** (runner Fly:
 > supercronic + fila `agent_jobs`, lógica TS testável), **Onda 4** (analytics: funil de 7 etapas +
 > diagnóstico read-only + resumo diário), **Onda 5** (ativação default-deny + campanha de vendas
-> OUTCOME_SALES reusando top criativos) e **Onda 7** (Nexus voz/chat: allowlist slug→skill, escrita só
-> enfileira com confirmação em dois turnos, STT/TTS/visão por proxy). Tudo com gates+builds verdes.
-> **Próxima: Onda 9 (editor LP + modo autônomo).** Pendências: validar `supabase db reset` ao vivo;
-> exercitar runner/skills/dashboard/Nexus com credenciais reais; skills create/publish de LP (cont. Onda 8).
+> OUTCOME_SALES reusando top criativos), **Onda 7** (Nexus voz/chat: allowlist slug→skill, escrita só
+> enfileira com confirmação em dois turnos, STT/TTS/visão por proxy), **Onda 8 completa** (skills
+> create/publish de LP) e **Onda 9** (editor de LP com concorrência otimista + modo autônomo do Nexus:
+> máquina de fases ≤1 narração/tick, live review com SSRF-guard). Tudo com gates+builds verdes.
+> **Próxima: Onda 10 (tracking — Cloudflare Worker).** Pendências: validar `supabase db reset` ao vivo;
+> exercitar runner/skills/dashboard/Nexus com credenciais reais (`fly deploy`).
 
 ### Onda 0 — Fundações do repositório
 - **Objetivo:** monorepo com tooling, contrato de env e documentação base.

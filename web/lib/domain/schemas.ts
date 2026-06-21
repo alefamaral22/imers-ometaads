@@ -114,6 +114,20 @@ export const landingPageRowSchema = z.object({
 });
 export type LandingPageRow = z.infer<typeof landingPageRowSchema>;
 
+// public.landing_page_sections
+export const landingPageSectionRowSchema = z.object({
+  id: z.string().uuid(),
+  landing_page_id: z.string().uuid(),
+  type: z.string(),
+  position: z.number(),
+  enabled: z.boolean(),
+  fields: z.record(z.string(), z.unknown()).nullable(),
+  version: z.number(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type LandingPageSectionRow = z.infer<typeof landingPageSectionRowSchema>;
+
 // public.operation_logs
 export const operationAction = z.enum(['create', 'update', 'delete', 'activate', 'pause']);
 export const operationLogRowSchema = z.object({

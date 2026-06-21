@@ -28,6 +28,9 @@ import { runChatTurn, confirmAndEnqueue } from '../../../lib/nexus/infra/chat-ru
 import { transcribe, synthesize } from '../../../lib/nexus/infra/voice';
 import { describeScreen } from '../../../lib/nexus/infra/vision';
 import { NexusUnavailableError } from '../../../lib/nexus/infra/anthropic';
+import { editSectionSchema, startWatchSchema } from '../../../lib/landing/edit';
+import { editSection } from '../../../lib/services/landing-sections';
+import { startWatch } from '../../../lib/services/watches';
 
 export const runtime = 'nodejs';
 
@@ -200,6 +203,33 @@ app.post('/nexus/capture', async (c) => {
 });
 
 app.get('/nexus/narrations', async (c) => c.json({ narrations: await listNarrations() }));
+
+// ── Landing editor + autonomous mode (protected) ───────────────────────────────
+app.use('/landing/*', async (c, next) => {
+  if (!(await requireOperatorApi(c))) return c.json({ error: 'unauthorized' }, 401);
+  await next();
+});
+
+// Edição síncrona de um campo de seção (concorrência otimista por versão).
+app.post('/landing/section', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = editSectionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const outcome = await editSection(parsed.data);
+  if (!outcome.ok) {
+    return c.json({ error: outcome.reason }, outcome.reason === 'not_found' ? 404 : 409);
+  }
+  return c.json({ ok: true, version: outcome.version });
+});
+
+// Inicia o modo autônomo (cria autonomous_watches; o runner avança por tick).
+app.post('/landing/autonomous', async (c) => {
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = startWatchSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const { id } = await startWatch(parsed.data);
+  return c.json({ ok: true, watchId: id });
+});
 
 app.get('/health', (c) => c.json({ ok: true }));
 

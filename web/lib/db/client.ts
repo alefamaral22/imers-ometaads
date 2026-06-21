@@ -65,12 +65,28 @@ export async function selectRows(table: string, options: SelectOptions = {}): Pr
   return Array.isArray(json) ? json : [];
 }
 
-/** Insert rows (used by the API to enqueue jobs in a later wave; kept minimal here). */
+/** Insert rows (used by the API to enqueue jobs / start watches). */
 export async function insertRows(table: string, rows: unknown[]): Promise<unknown[]> {
   const json = await restRequest(table, {
     method: 'POST',
     headers: { prefer: 'return=representation' },
     body: JSON.stringify(rows),
+  });
+  return Array.isArray(json) ? json : [];
+}
+
+/** Patch rows matching equality filters (server-side, service_role). Returns the updated rows. */
+export async function patchRows(
+  table: string,
+  eq: Record<string, string>,
+  patch: Record<string, unknown>,
+): Promise<unknown[]> {
+  const params = new URLSearchParams();
+  for (const [col, value] of Object.entries(eq)) params.append(col, `eq.${value}`);
+  const json = await restRequest(`${table}?${params.toString()}`, {
+    method: 'PATCH',
+    headers: { prefer: 'return=representation' },
+    body: JSON.stringify(patch),
   });
   return Array.isArray(json) ? json : [];
 }

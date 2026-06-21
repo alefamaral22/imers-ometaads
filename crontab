@@ -4,6 +4,9 @@
 # Fila: processa no máximo 1 job por minuto (lock + claim atômico em poll-agent-jobs.sh).
 * * * * * bash /app/scripts/poll-agent-jobs.sh >> /app/logs/poll.log 2>&1
 
+# Onda 9 — Modo autônomo: avança 1 tick de um watch ativo por minuto (lock + claim atômico).
+* * * * * bash /app/scripts/poll-autonomous-watches.sh >> /app/logs/watch.log 2>&1
+
 # Skill de tráfego agendada — aceite da Onda 3: "cron dispara a skill da Onda 2". Diária às 09:00 UTC.
 0 9 * * * bash /app/scripts/run-skill.sh create-traffic-cliente-exemplo-campaign >> /app/logs/cron.log 2>&1
 
