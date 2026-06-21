@@ -306,12 +306,7 @@ function Video(f: VideoFields): ReactElement {
       <div className="container">
         {f.headline !== undefined && <h2>{f.headline}</h2>}
         <div className="video-frame">
-          <iframe
-            src={f.embedUrl}
-            title={f.headline ?? 'video'}
-            allowFullScreen
-            loading="lazy"
-          />
+          <iframe src={f.embedUrl} title={f.headline ?? 'video'} allowFullScreen loading="lazy" />
         </div>
       </div>
     </section>

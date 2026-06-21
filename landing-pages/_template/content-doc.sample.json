@@ -66,9 +66,21 @@
       "fields": {
         "headline": "O que você recebe",
         "features": [
-          { "icon": "check", "title": "Aulas práticas", "description": "Passo a passo aplicável hoje." },
-          { "icon": "bolt", "title": "Templates prontos", "description": "Copie, cole e publique." },
-          { "icon": "trophy", "title": "Bônus exclusivos", "description": "Materiais de apoio premium." }
+          {
+            "icon": "check",
+            "title": "Aulas práticas",
+            "description": "Passo a passo aplicável hoje."
+          },
+          {
+            "icon": "bolt",
+            "title": "Templates prontos",
+            "description": "Copie, cole e publique."
+          },
+          {
+            "icon": "trophy",
+            "title": "Bônus exclusivos",
+            "description": "Materiais de apoio premium."
+          }
         ]
       }
     },
@@ -107,7 +119,11 @@
       "fields": {
         "headline": "Quem aplicou, aprova",
         "testimonials": [
-          { "quote": "Triplicamos as vendas em 60 dias.", "author": "Ana Souza", "role": "Infoprodutora" },
+          {
+            "quote": "Triplicamos as vendas em 60 dias.",
+            "author": "Ana Souza",
+            "role": "Infoprodutora"
+          },
           { "quote": "Finalmente um método claro.", "author": "Carlos Lima", "role": "E-commerce" }
         ]
       }
@@ -148,7 +164,10 @@
         "headline": "Perguntas frequentes",
         "items": [
           { "question": "Funciona para iniciantes?", "answer": "Sim, começamos do zero." },
-          { "question": "Tenho acesso por quanto tempo?", "answer": "Acesso vitalício ao conteúdo." }
+          {
+            "question": "Tenho acesso por quanto tempo?",
+            "answer": "Acesso vitalício ao conteúdo."
+          }
         ]
       }
     },
