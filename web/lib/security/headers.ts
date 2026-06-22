@@ -13,23 +13,24 @@ export function generateNonce(): string {
   return btoa(binary);
 }
 
-export function buildContentSecurityPolicy(nonce: string): string {
-  // Why 'strict-dynamic' + nonce: lets Next's bootstrap script load its chunks without
-  // listing every hash, while blocking arbitrary inline/injected scripts.
+export function buildContentSecurityPolicy(nonce: string, dev = false): string {
+  // Prod: 'strict-dynamic' + nonce — Next's bootstrap carrega seus chunks sem listar cada hash e
+  // bloqueia script inline/injetado. Dev: o Next usa eval (HMR/React Refresh) e um websocket de
+  // hot-reload, que a política estrita bloquearia (a página não hidrataria). Por isso, SÓ em dev,
+  // relaxamos script-src ('unsafe-eval'/'unsafe-inline') e connect-src (ws:) — nunca em produção.
+  const scriptSrc = dev
+    ? ["'self'", "'unsafe-eval'", "'unsafe-inline'", 'https://challenges.cloudflare.com']
+    : ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'", 'https://challenges.cloudflare.com'];
+  const connectSrc = dev ? ["'self'", 'ws:', 'wss:'] : ["'self'"];
+
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
     'base-uri': ["'self'"],
-    'script-src': [
-      "'self'",
-      `'nonce-${nonce}'`,
-      "'strict-dynamic'",
-      // Cloudflare Turnstile widget (optional login bot protection).
-      'https://challenges.cloudflare.com',
-    ],
+    'script-src': scriptSrc,
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'data:', 'blob:'],
     'font-src': ["'self'"],
-    'connect-src': ["'self'"],
+    'connect-src': connectSrc,
     'frame-src': ['https://challenges.cloudflare.com'],
     'frame-ancestors': ["'none'"],
     'form-action': ["'self'"],
@@ -49,9 +50,9 @@ export interface SecurityHeaders {
  * The full security header set for every response. HSTS, CSP (nonce), X-Content-Type-Options,
  * X-Frame-Options, Referrer-Policy + a couple of hardening extras.
  */
-export function buildSecurityHeaders(nonce: string): SecurityHeaders {
+export function buildSecurityHeaders(nonce: string, dev = false): SecurityHeaders {
   return {
-    'Content-Security-Policy': buildContentSecurityPolicy(nonce),
+    'Content-Security-Policy': buildContentSecurityPolicy(nonce, dev),
     'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',

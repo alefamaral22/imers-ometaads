@@ -24,7 +24,8 @@ function isPublicPath(pathname: string): boolean {
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const nonce = generateNonce();
-  const headers = buildSecurityHeaders(nonce);
+  // Em desenvolvimento o CSP é relaxado (eval/ws do HMR do Next); em produção é estrito (nonce).
+  const headers = buildSecurityHeaders(nonce, process.env.NODE_ENV !== 'production');
   const { pathname } = request.nextUrl;
 
   // Forward the nonce to Server Components via request headers so they can tag inline scripts.
