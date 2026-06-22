@@ -21,9 +21,9 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo) + **10 ✅** (tracking Worker) + **11 ✅** (hardening + CI/CD). **Build completo (Ondas 0→11).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus/Worker não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly nem `wrangler deploy`); CI/deploy não rodaram em GitHub real ainda. |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo) + **10 ✅** (tracking Worker) + **11 ✅** (hardening + CI/CD). **Build completo (Ondas 0→11).** ✅ **Banco real provisionado** (Supabase `yjmngxsdfsxtzjastvwi`): 20 tabelas c/ RLS + RPCs (`claim_agent_job`/`claim_autonomous_watch`/`set_updated_at`) + 4 buckets (`ad-ingest`/`landing-assets` públicos, `creatives`/`nexus-review` privados) + seed `cliente-exemplo` (cap 5000 cents, BRL) — **aceite da Onda 1 validado ao vivo via MCP** (não precisou `db reset`). ⚠️ Falta: preencher `SUPABASE_SECRET_KEY` no `web/.env.local`; runner/skills/Nexus/Worker não exercitados ao vivo (sem deploy Fly/`wrangler`); CI/deploy não rodaram em GitHub real ainda. |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
-| **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
+| **.env.local** | Raiz: esqueleto (Supabase/Claude/OpenAI ainda vazios). **`web/.env.local` criado** p/ rodar o dashboard (Next lê de `web/`): Supabase URL + publishable key preenchidas via MCP, `AUTH_SECRET` gerado, senha temp `nexus-local`. ⚠️ Falta colar `SUPABASE_SECRET_KEY` (service_role). |
 | **Tooling** | lint / typecheck / test **verdes**. |
 | **Dependências npm** | Instaladas (153 pkgs). 5 vulnerabilidades (devDeps transitivas) → adiadas p/ Onda 11. |
 
@@ -210,10 +210,12 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - `supabase/config.toml` (local) + `supabase/seed.sql` (cliente-exemplo, idempotente).
 - Docs: `docs/specs/meta-ads-persistence-schema.md`, ADR `0002-supabase-persistence`, ADR `0009-agent-jobs-queue`.
 - **Tooling verde:** lint/typecheck/test/format.
-- ⚠️ **PENDENTE:** `supabase db reset` não rodou (sem Supabase CLI/psql; Docker daemon parado).
-  - **Validador pronto sem credenciais:** suba o Docker Desktop e eu rodo um Postgres 16 efêmero +
-    `scripts/_validate_shim.sql` (cria roles `service_role`/`anon`/`authenticated` + schema `storage`)
-    e aplico todas as migrations + seed + checks de aceite. Alternativa: instalar Supabase CLI e preencher `SUPABASE_*`.
+- ✅ **VALIDADO AO VIVO (via MCP, 2026-06):** o schema já está aplicado no projeto Supabase real
+  `yjmngxsdfsxtzjastvwi` — `list_tables` mostra as **20 tabelas com RLS habilitado**; as RPCs
+  `claim_agent_job`/`claim_autonomous_watch`/`set_updated_at` existem; os 4 buckets estão criados
+  (`ad-ingest`/`landing-assets` públicos, `creatives`/`nexus-review` privados); e o **seed
+  `cliente-exemplo`** está presente (1 linha; cap 5000 cents, BRL, landing `cliente-exemplo.example.com`).
+  Não foi necessário `supabase db reset` — o aceite da Onda 1 está satisfeito no banco real.
 ### Onda 2 — Runtime de skills + 1ª skill (tráfego) ✅ (commit `aa9a0ab`)
 - Lógica pura testável `scripts/onda2/` (domain/app/infra): ângulos (3: authority/pain/offer),
   clamp de orçamento ≤ teto, payloads Meta (PAUSED, OUTCOME_TRAFFIC), persistência REST
