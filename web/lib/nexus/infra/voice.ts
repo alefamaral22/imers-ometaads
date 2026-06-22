@@ -8,8 +8,8 @@ import {
   clampVol,
   hexToBytes,
   parseMinimaxResponse,
+  pickTtsProvider,
   resolveMinimaxVoice,
-  resolveTtsProvider,
 } from '../domain/tts';
 
 /**
@@ -53,7 +53,11 @@ export interface TtsOptions {
 /** Sintetiza fala. Despacha pelo provedor configurado; devolve bytes de áudio (audio/mpeg). */
 export async function synthesize(text: string, opts: TtsOptions = {}): Promise<ArrayBuffer> {
   const env = serverEnv();
-  if (resolveTtsProvider(env.TTS_PROVIDER) === 'minimax') {
+  const provider = pickTtsProvider(env.TTS_PROVIDER, {
+    minimax: Boolean(env.MINIMAX_API_KEY),
+    elevenlabs: Boolean(env.ELEVENLABS_API_KEY && env.ELEVENLABS_VOICE_ID),
+  });
+  if (provider === 'minimax') {
     return synthesizeMinimax(env, text, opts);
   }
   return synthesizeElevenLabs(env, text);

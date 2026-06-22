@@ -41,9 +41,12 @@ drop-in futuro sem mudar a arquitetura.
 ## Atualização — TTS plugável (ElevenLabs | MiniMax)
 
 O TTS ganhou um segundo provedor sem mudar a arquitetura nem o contrato. `TTS_PROVIDER`
-(`elevenlabs` default | `minimax`) escolhe o backend; **trocar = mudar a env**. `synthesize(text, opts)`
-despacha internamente e devolve sempre `audio/mpeg`, então a rota `/api/nexus/tts` e o cliente não
-mudam. A chave continua **só no servidor** (`Authorization: Bearer` no caso da MiniMax).
+(`minimax` **default** | `elevenlabs`) escolhe a preferência; **trocar = mudar a env**. A escolha é
+**ciente de credencial** (`pickTtsProvider`): usa o preferido quando a chave dele existe, senão cai
+para o outro provedor disponível ("em segundo caso"), senão mantém o preferido (degrada para `503`).
+`synthesize(text, opts)` despacha internamente e devolve sempre `audio/mpeg`, então a rota
+`/api/nexus/tts` e o cliente não mudam. A chave continua **só no servidor** (`Authorization: Bearer`
+no caso da MiniMax). **Decisão do operador:** MiniMax é o padrão; ElevenLabs é o fallback.
 
 A lógica do MiniMax fica **pura e testada** em `lib/nexus/domain/tts.ts`: montagem do corpo do
 `t2a_v2` (`speech-02-turbo`, `language_boost: 'pt'`, ranges speed/pitch/vol), validação da resposta

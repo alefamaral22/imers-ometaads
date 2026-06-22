@@ -338,9 +338,9 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   allowlist de vozes PT da MiniMax (`resolveMinimaxVoice` deny-by-default), clamps speed/pitch/vol,
   `buildMinimaxBody` (`speech-02-turbo`, `language_boost: 'pt'`, params fixos de produção),
   `parseMinimaxResponse` (`base_resp.status_code===0`) e `hexToBytes` (HEX→MP3).
-- `voice.ts`: `synthesize(text, opts)` despacha por `TTS_PROVIDER`; ElevenLabs e MiniMax devolvem o
-  mesmo `audio/mpeg` → rota `/api/nexus/tts` e cliente inalterados. Chave da MiniMax só no servidor
-  (`Authorization: Bearer`, endpoint `api.minimax.io/v1/t2a_v2`).
+- `voice.ts`: `synthesize(text, opts)` despacha por `pickTtsProvider` (**default MiniMax**, ElevenLabs
+  como fallback ciente de credencial); os dois devolvem `audio/mpeg` → rota `/api/nexus/tts` e cliente
+  inalterados. Chave da MiniMax só no servidor (`Authorization: Bearer`, `api.minimax.io/v1/t2a_v2`).
 - Envs novas: `TTS_PROVIDER`, `MINIMAX_API_KEY`, `MINIMAX_VOICE_ID` (em `web/lib/env.ts`,
   `types/env.d.ts`; **falta espelhar no `.env.example`** — bloqueado por permissão nesta sessão).
   `ttsRequestSchema` aceita voice/speed/pitch/vol; widget ganhou seletor de voz PT (default

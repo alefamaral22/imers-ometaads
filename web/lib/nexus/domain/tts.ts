@@ -1,6 +1,6 @@
 /**
  * TTS — provedor plugável (ElevenLabs | MiniMax) + helpers PUROS do MiniMax (SPEC-016 / ADR 0011).
- * A escolha é por env TTS_PROVIDER (default 'elevenlabs'); trocar = mudar a env. A chave NUNCA vai
+ * A escolha é por env TTS_PROVIDER (default 'minimax', com ElevenLabs em segundo caso); trocar = mudar a env. A chave NUNCA vai
  * ao browser — o TTS passa pela rota protegida /api/nexus/tts. Texto/voz são dado, não instrução.
  * Sem I/O: a chamada HTTP fica na infra (voice.ts); aqui só validação/montagem testável.
  */
@@ -10,9 +10,28 @@ export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 const TTS_PROVIDER_SET = new Set<string>(TTS_PROVIDERS);
 
-/** Resolve o provedor a partir da env. Ausente/inválido => 'elevenlabs' (default seguro). */
+/** Resolve a PREFERÊNCIA a partir da env. Ausente/inválido => 'minimax' (default do projeto). */
 export function resolveTtsProvider(raw: string | undefined): TtsProvider {
-  return raw !== undefined && TTS_PROVIDER_SET.has(raw) ? (raw as TtsProvider) : 'elevenlabs';
+  return raw !== undefined && TTS_PROVIDER_SET.has(raw) ? (raw as TtsProvider) : 'minimax';
+}
+
+/** Quais provedores têm credencial no servidor (calculado na infra a partir da env). */
+export interface TtsKeyAvailability {
+  minimax: boolean;
+  elevenlabs: boolean;
+}
+
+/**
+ * Provedor EFETIVO: respeita a preferência (TTS_PROVIDER, default minimax) quando a chave dela
+ * existe; senão cai para o outro provedor disponível ("em segundo caso"); senão mantém o preferido
+ * (que vai degradar para 503). Pura — a leitura de chaves fica na infra.
+ */
+export function pickTtsProvider(raw: string | undefined, avail: TtsKeyAvailability): TtsProvider {
+  const preferred = resolveTtsProvider(raw);
+  const other: TtsProvider = preferred === 'minimax' ? 'elevenlabs' : 'minimax';
+  if (avail[preferred]) return preferred;
+  if (avail[other]) return other;
+  return preferred;
 }
 
 // Vozes PT da MiniMax (allowlist deny-by-default). `label` é só para a UI.

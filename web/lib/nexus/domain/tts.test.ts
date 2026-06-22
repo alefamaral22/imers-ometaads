@@ -7,18 +7,39 @@ import {
   DEFAULT_MINIMAX_VOICE,
   hexToBytes,
   parseMinimaxResponse,
+  pickTtsProvider,
   resolveMinimaxVoice,
   resolveTtsProvider,
 } from './tts';
 
 describe('resolveTtsProvider', () => {
-  it('defaults to elevenlabs when absent/invalid', () => {
-    expect(resolveTtsProvider(undefined)).toBe('elevenlabs');
-    expect(resolveTtsProvider('foo')).toBe('elevenlabs');
+  it('defaults to minimax when absent/invalid', () => {
+    expect(resolveTtsProvider(undefined)).toBe('minimax');
+    expect(resolveTtsProvider('foo')).toBe('minimax');
   });
   it('accepts the known providers', () => {
     expect(resolveTtsProvider('minimax')).toBe('minimax');
     expect(resolveTtsProvider('elevenlabs')).toBe('elevenlabs');
+  });
+});
+
+describe('pickTtsProvider (preferência minimax + fallback eleven)', () => {
+  it('default usa minimax quando a chave existe', () => {
+    expect(pickTtsProvider(undefined, { minimax: true, elevenlabs: true })).toBe('minimax');
+    expect(pickTtsProvider(undefined, { minimax: true, elevenlabs: false })).toBe('minimax');
+  });
+  it('default cai para elevenlabs quando minimax não tem chave', () => {
+    expect(pickTtsProvider(undefined, { minimax: false, elevenlabs: true })).toBe('elevenlabs');
+  });
+  it('respeita a preferência explícita quando ela tem chave', () => {
+    expect(pickTtsProvider('elevenlabs', { minimax: true, elevenlabs: true })).toBe('elevenlabs');
+  });
+  it('preferência sem chave cai para o outro disponível', () => {
+    expect(pickTtsProvider('elevenlabs', { minimax: true, elevenlabs: false })).toBe('minimax');
+  });
+  it('sem nenhuma chave mantém o preferido (degrada para 503)', () => {
+    expect(pickTtsProvider(undefined, { minimax: false, elevenlabs: false })).toBe('minimax');
+    expect(pickTtsProvider('elevenlabs', { minimax: false, elevenlabs: false })).toBe('elevenlabs');
   });
 });
 

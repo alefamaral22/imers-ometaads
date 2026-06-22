@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { resolveTtsProvider } from './nexus/domain/tts';
+import { pickTtsProvider } from './nexus/domain/tts';
 
 /**
  * Environment contract (SPEC-000 §7). Validation is done by typed schema at the process
@@ -33,8 +33,8 @@ export const serverEnvSchema = z.object({
   // key is absent — the dashboard still builds and runs without them.
   CLAUDE_API_KEY: z.string().trim().optional(), // chat loop (Anthropic Messages API)
   OPENAI_API_KEY: z.string().trim().optional(), // STT (Whisper)
-  // TTS plugável (ADR 0011): TTS_PROVIDER escolhe o provedor; default 'elevenlabs'. Trocar = mudar
-  // a env. Cada provedor degrada para "indisponível" quando sua chave falta.
+  // TTS plugável (ADR 0011): TTS_PROVIDER escolhe o provedor; default 'minimax' (ElevenLabs em
+  // segundo caso). Trocar = mudar a env. Cada provedor degrada para "indisponível" sem sua chave.
   TTS_PROVIDER: z.string().trim().optional(),
   ELEVENLABS_API_KEY: z.string().trim().optional(), // TTS (provider elevenlabs)
   ELEVENLABS_VOICE_ID: z.string().trim().optional(),
@@ -109,10 +109,12 @@ export function isTtsEnabled(
     'TTS_PROVIDER' | 'ELEVENLABS_API_KEY' | 'ELEVENLABS_VOICE_ID' | 'MINIMAX_API_KEY'
   >,
 ): boolean {
-  if (resolveTtsProvider(server.TTS_PROVIDER) === 'minimax') {
-    return Boolean(server.MINIMAX_API_KEY);
-  }
-  return Boolean(server.ELEVENLABS_API_KEY && server.ELEVENLABS_VOICE_ID);
+  const avail = {
+    minimax: Boolean(server.MINIMAX_API_KEY),
+    elevenlabs: Boolean(server.ELEVENLABS_API_KEY && server.ELEVENLABS_VOICE_ID),
+  };
+  // Habilitado quando o provedor efetivo (preferência + fallback) tem credencial.
+  return avail[pickTtsProvider(server.TTS_PROVIDER, avail)];
 }
 
 let cachedServerEnv: ServerEnv | null = null;
