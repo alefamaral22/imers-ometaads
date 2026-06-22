@@ -1,6 +1,6 @@
 # Onda 3 — Runner headless no Fly.io (SPEC §8 Onda 3 / §10, ADR 0001).
 # App de placeholder do template: "meta-ads-agents". Sem serviço HTTP → nenhuma porta exposta.
-app = "meta-ads-agents"
+app = "imers-ometaads"
 primary_region = "gru"
 
 [build]
