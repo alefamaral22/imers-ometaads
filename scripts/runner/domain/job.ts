@@ -16,6 +16,10 @@ export interface ClaimedJob {
 export function parseClaimedJob(value: unknown): ClaimedJob | null {
   if (value === null || value === undefined) return null;
   const obj = requireObject(value, 'job');
+  // Fila vazia: dependendo da versão do PostgREST, a RPC pode devolver um composite com todos os
+  // campos NULL (uma "row de nulls") em vez de JSON null. Tratar id ausente/vazio como "sem job"
+  // — caso contrário cada tick ocioso lançaria e inundaria o log (não é erro, é fila vazia).
+  if (obj.id === null || obj.id === undefined || obj.id === '') return null;
   const args = obj.args;
   return {
     id: requireString(obj.id, 'job.id'),

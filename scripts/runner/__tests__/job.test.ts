@@ -10,6 +10,12 @@ describe('parseClaimedJob', () => {
     expect(parseClaimedJob(undefined)).toBeNull();
   });
 
+  it('returns null on an empty-queue "row of nulls" (PostgREST composite)', () => {
+    // Fila vazia em produção: a RPC devolveu { id: null, skill: null, ... } em vez de JSON null.
+    expect(parseClaimedJob({ id: null, skill: null, kind: null, args: null })).toBeNull();
+    expect(parseClaimedJob({})).toBeNull();
+  });
+
   it('parses a claimed row and defaults args to {}', () => {
     const job = parseClaimedJob({
       id: '11111111-1111-1111-1111-111111111111',

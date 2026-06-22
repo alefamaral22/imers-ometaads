@@ -18,6 +18,10 @@ primary_region = "gru"
 [env]
   TZ = "UTC"
   CLAUDE_CONFIG_DIR = "/root/.claude"
+  # A máquina Fly é uma VM isolada e roda como root; o Claude Code recusa
+  # `--dangerously-skip-permissions` como root salvo em sandbox. Esta flag libera o modo headless
+  # nesse ambiente controlado (sem ela, toda skill falha antes de começar).
+  IS_SANDBOX = "1"
 
 [[vm]]
   size = "shared-cpu-1x"
