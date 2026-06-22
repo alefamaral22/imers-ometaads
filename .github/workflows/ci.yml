@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# CI verde é obrigatório para merge (SPEC §12). Cancela runs antigos do mesmo ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: lint + typecheck + test (coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Prettier (format check)
+        run: npm run format
+      - name: ESLint
+        run: npm run lint
+      - name: Typecheck (raiz)
+        run: npm run typecheck
+      - name: Tests + cobertura mínima (domain/application)
+        run: npm run test:coverage
+
+  web-build:
+    name: web build (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (web)
+        run: npm run typecheck --workspace web
+      - name: next build
+        run: npm run build --workspace web
+        env:
+          # Build estático não precisa de segredos; NEXT_PUBLIC_* placeholders bastam.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder
+          AUTH_SECRET: ci-build-placeholder-secret-32-bytes-minimum
+
+  secret-scan:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml

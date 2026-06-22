@@ -1,0 +1,22 @@
+# Config do gitleaks (Onda 11). Estende as regras default e isenta arquivos que, por contrato,
+# contêm só PLACEHOLDERS (nunca segredos reais): o .env.example (espelho de chaves sem valor),
+# os docs e os fixtures de teste (tokens fake como "TKN"/"service-key").
+
+title = "meta-ads-agents gitleaks"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders e fixtures — sem segredos reais"
+paths = [
+  '''\.env\.example$''',
+  '''^docs/''',
+  '''.*\.test\.ts$''',
+  '''.*\.spec\.ts$''',
+  '''wrangler\.toml$''',
+]
+regexes = [
+  '''REPLACE_WITH_[A-Z0-9_]+''',
+  '''https://REPLACE\.supabase\.co''',
+]

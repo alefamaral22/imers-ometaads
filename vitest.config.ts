@@ -7,8 +7,17 @@ export default defineConfig({
     exclude: ['node_modules', 'venv', 'dist', '.next', 'out'],
     coverage: {
       provider: 'v8',
-      // Onda 11: cobertura mínima em domain/ e application/.
+      reporter: ['text-summary', 'text'],
+      // Onda 11: cobertura mínima em domain/ e application/ (a lógica pura do projeto).
       include: ['**/domain/**', '**/application/**'],
+      // Gate do CI (npm run test:coverage). Limites abaixo do medido, com folga p/ não ser flaky;
+      // sobem conforme a cobertura cresce. Sobe = bom; cair abaixo destes barra o merge.
+      thresholds: {
+        statements: 55,
+        branches: 70,
+        functions: 70,
+        lines: 55,
+      },
     },
   },
 });

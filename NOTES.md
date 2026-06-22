@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo) + **10 ✅** (tracking Worker). **Próxima: Onda 11 (hardening + CI/CD).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus/Worker não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly nem `wrangler deploy`). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo) + **10 ✅** (tracking Worker) + **11 ✅** (hardening + CI/CD). **Build completo (Ondas 0→11).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus/Worker não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly nem `wrangler deploy`); CI/deploy não rodaram em GitHub real ainda. |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -333,4 +333,24 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   `wrangler`/miniflare; segredos via `wrangler secret` (nunca no `.toml`); Google Ads via GA4
   (evita Google Ads API/OAuth no Worker). Docs: SPEC-015, ADR 0021, threat model `landing-page-tracking`.
 - ⚠️ Não exercitado ao vivo (sem bindings KV/D1 nem `wrangler deploy`); lógica 100% testada.
-### Onda 11 — Hardening + CI/CD ⏳
+### Onda 11 — Hardening, observabilidade & CI/CD ✅ (commit nesta onda)
+- **CI** `.github/workflows/ci.yml` (push/PR, gate de merge): jobs `quality` (npm ci → format → lint
+  → typecheck → `test:coverage`), `web-build` (typecheck + `next build` do workspace web com
+  NEXT_PUBLIC_* placeholders) e `secret-scan` (gitleaks, `fetch-depth: 0`). `concurrency` +
+  `permissions: contents: read`.
+- **Deploy** `.github/workflows/deploy.yml` (push main / manual): jobs `fly` (`flyctl deploy`) e
+  `vercel` (`vercel deploy --prod`), cada um com **secret-check que pula** se o token faltar (nunca
+  falha por falta de credencial). Segredos só via `env` de step (anti-injeção).
+- **Cobertura:** `@vitest/coverage-v8` + `npm run test:coverage`; thresholds em `domain/`/`application/`
+  (statements/lines 55, branches/functions 70 — medido 60.2/87.2/84.9/60.2, com folga). `test` default
+  segue sem coverage (gate rápido).
+- **Secret scan:** `.gitleaks.toml` (estende default; allowlist só de placeholders: `.env.example`,
+  `docs/`, fixtures `*.test.ts`, `wrangler.toml`, `REPLACE_WITH_*`).
+- **`vercel.json`:** framework nextjs, region gru1, build do monorepo (`--workspace web`), **cron**
+  `/api/health` a cada 10 min. `/api/health` liberado no `web/middleware.ts` (liveness público NO-PII).
+- **Threat models:** `ci-cd-supply-chain.md` (superfície nova) + `web-dashboard.md` (lacuna da Onda 6).
+  Docs: spec `ci-cd-and-hardening`, ADR 0022. Observabilidade já coberta (`agent_events.run_id`; logs
+  NO-PII no Worker) — onda só revisa/documenta.
+- **Decisão:** `npm audit` NÃO é gate (devDeps transitivas; `--force` = breaking) — dívida monitorada.
+- ⚠️ CI/deploy ainda não rodaram num GitHub real (sem remote); gates locais 100% verdes
+  (lint/typecheck/format/test/test:coverage + `cd web && next build`).

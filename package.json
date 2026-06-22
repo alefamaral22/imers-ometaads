@@ -18,11 +18,13 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
     "@types/node": "^22.8.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.13.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.3.3",

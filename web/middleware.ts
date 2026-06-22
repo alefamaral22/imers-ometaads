@@ -13,7 +13,8 @@ import { buildSecurityHeaders, generateNonce } from './lib/security/headers';
  */
 
 // Paths reachable without a session. Everything else under matcher requires auth.
-const PUBLIC_PATHS = new Set(['/login']);
+// `/api/health` is a public liveness probe (NO-PII, no data) hit by the Vercel cron (Onda 11).
+const PUBLIC_PATHS = new Set(['/login', '/api/health']);
 const PUBLIC_PREFIXES = ['/api/auth/'];
 
 function isPublicPath(pathname: string): boolean {

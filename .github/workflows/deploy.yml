@@ -1,0 +1,73 @@
+name: Deploy
+
+# Deploy do dashboard (Vercel) e do runner (Fly) após push na main, ou manualmente.
+# Cada job degrada para "skip" quando o segredo correspondente não está configurado — assim
+# o workflow nunca falha por falta de credencial (não bloqueia merges; SPEC §12).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fly:
+    name: Fly.io (runner)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check FLY_API_TOKEN
+        id: check
+        env:
+          TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FLY_API_TOKEN ausente — pulando deploy do Fly."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.configured == 'true'
+        uses: actions/checkout@v4
+      - if: steps.check.outputs.configured == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - if: steps.check.outputs.configured == 'true'
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  vercel:
+    name: Vercel (dashboard)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check VERCEL_TOKEN
+        id: check
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN ausente — pulando deploy do Vercel."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.configured == 'true'
+        uses: actions/checkout@v4
+      - if: steps.check.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.check.outputs.configured == 'true'
+        run: npm ci
+      - if: steps.check.outputs.configured == 'true'
+        name: Vercel deploy (prod)
+        run: npx vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

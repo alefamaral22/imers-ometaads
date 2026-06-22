@@ -193,9 +193,12 @@ tudo via `fly secrets`; o dashboard via env do Vercel. Modelos do Nexus configur
 > create/publish de LP) e **Onda 9** (editor de LP com concorrência otimista + modo autônomo do Nexus:
 > máquina de fases ≤1 narração/tick, live review com SSRF-guard) e **Onda 10** (tracking server-side:
 > Worker `POST /e` em `track.example.com`, espelho NO-PII em `lp_events`, fan-out CAPI/GA4, rate limit
-> por IP, idempotência por `event_id`). Tudo com gates+builds verdes.
-> **Próxima: Onda 11 (hardening, observabilidade & CI/CD).** Pendências: validar `supabase db reset` ao
-> vivo; exercitar runner/skills/dashboard/Nexus/Worker com credenciais reais (`fly deploy`/`wrangler deploy`).
+> por IP, idempotência por `event_id`) e **Onda 11** (hardening + CI/CD: GitHub Actions com gate de
+> merge — format/lint/typecheck/test+cobertura/web-build/gitleaks —, deploy Vercel+Fly tolerante a
+> segredo ausente, `vercel.json` com cron, threat models de CI/CD e dashboard). **Build completo
+> (Ondas 0→11)** com gates+builds verdes. Pendências de validação ao vivo: `supabase db reset`;
+> exercitar runner/skills/dashboard/Nexus/Worker com credenciais reais (`fly deploy`/`wrangler deploy`);
+> rodar CI/deploy num GitHub real.
 
 ### Onda 0 — Fundações do repositório
 - **Objetivo:** monorepo com tooling, contrato de env e documentação base.
