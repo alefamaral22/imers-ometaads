@@ -37,3 +37,16 @@ drop-in futuro sem mudar a arquitetura.
 - **Chamar OpenAI/ElevenLabs direto do browser** — rejeitado: exporia segredos no cliente
   (`NEXT_PUBLIC_*` nunca carrega segredo — SPEC §7/§11).
 - **Exigir as chaves para o build** — rejeitado: quebraria dev/preview; a degradação graciosa é melhor.
+
+## Atualização — TTS plugável (ElevenLabs | MiniMax)
+
+O TTS ganhou um segundo provedor sem mudar a arquitetura nem o contrato. `TTS_PROVIDER`
+(`elevenlabs` default | `minimax`) escolhe o backend; **trocar = mudar a env**. `synthesize(text, opts)`
+despacha internamente e devolve sempre `audio/mpeg`, então a rota `/api/nexus/tts` e o cliente não
+mudam. A chave continua **só no servidor** (`Authorization: Bearer` no caso da MiniMax).
+
+A lógica do MiniMax fica **pura e testada** em `lib/nexus/domain/tts.ts`: montagem do corpo do
+`t2a_v2` (`speech-02-turbo`, `language_boost: 'pt'`, ranges speed/pitch/vol), validação da resposta
+(`base_resp.status_code === 0`) e decodificação do áudio (a MiniMax devolve **HEX** → MP3). A voz é
+resolvida por **allowlist deny-by-default** (request > `MINIMAX_VOICE_ID` > `Portuguese_Solemn_Narrator_v1`);
+o widget tem um seletor das vozes PT. `isTtsEnabled` passou a considerar o provedor ativo.

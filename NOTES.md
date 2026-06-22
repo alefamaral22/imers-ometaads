@@ -333,6 +333,19 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   `wrangler`/miniflare; segredos via `wrangler secret` (nunca no `.toml`); Google Ads via GA4
   (evita Google Ads API/OAuth no Worker). Docs: SPEC-015, ADR 0021, threat model `landing-page-tracking`.
 - ⚠️ Não exercitado ao vivo (sem bindings KV/D1 nem `wrangler deploy`); lógica 100% testada.
+### Pós-Onda 11 — TTS plugável (ElevenLabs | MiniMax) ✅ (commit nesta sessão)
+- `web/lib/nexus/domain/tts.ts` (puro, **15 testes**): `resolveTtsProvider` (default elevenlabs),
+  allowlist de vozes PT da MiniMax (`resolveMinimaxVoice` deny-by-default), clamps speed/pitch/vol,
+  `buildMinimaxBody` (`speech-02-turbo`, `language_boost: 'pt'`, params fixos de produção),
+  `parseMinimaxResponse` (`base_resp.status_code===0`) e `hexToBytes` (HEX→MP3).
+- `voice.ts`: `synthesize(text, opts)` despacha por `TTS_PROVIDER`; ElevenLabs e MiniMax devolvem o
+  mesmo `audio/mpeg` → rota `/api/nexus/tts` e cliente inalterados. Chave da MiniMax só no servidor
+  (`Authorization: Bearer`, endpoint `api.minimax.io/v1/t2a_v2`).
+- Envs novas: `TTS_PROVIDER`, `MINIMAX_API_KEY`, `MINIMAX_VOICE_ID` (em `web/lib/env.ts`,
+  `types/env.d.ts`; **falta espelhar no `.env.example`** — bloqueado por permissão nesta sessão).
+  `ttsRequestSchema` aceita voice/speed/pitch/vol; widget ganhou seletor de voz PT (default
+  `Portuguese_Solemn_Narrator_v1`). `isTtsEnabled` considera o provedor ativo. ADR 0011 atualizado.
+- Gates verdes: lint, typecheck (raiz + web), 211 testes, format, `cd web && next build`.
 ### Onda 11 — Hardening, observabilidade & CI/CD ✅ (commit nesta onda)
 - **CI** `.github/workflows/ci.yml` (push/PR, gate de merge): jobs `quality` (npm ci → format → lint
   → typecheck → `test:coverage`), `web-build` (typecheck + `next build` do workspace web com

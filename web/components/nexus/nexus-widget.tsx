@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useVoice } from './use-voice';
 import { Visualizer } from './visualizer';
+import { DEFAULT_MINIMAX_VOICE, MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
 
 interface ChatMsg {
   role: 'user' | 'assistant';
@@ -33,6 +34,8 @@ export function NexusWidget() {
   const [input, setInput] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [loading, setLoading] = useState(false);
+  // Voz do TTS (só aplica ao provedor MiniMax; o ElevenLabs usa a voz da env e ignora).
+  const [ttsVoice, setTtsVoice] = useState(DEFAULT_MINIMAX_VOICE);
   const voice = useVoice();
 
   const push = useCallback((m: ChatMsg) => setMessages((prev) => [...prev, m]), []);
@@ -65,12 +68,12 @@ export function NexusWidget() {
         const data = (await res.json()) as ChatResponse;
         push({ role: 'assistant', text: data.reply });
         setPending(data.pending ?? null);
-        void voice.speak(data.reply);
+        void voice.speak(data.reply, ttsVoice);
       } finally {
         setLoading(false);
       }
     },
-    [loading, messages, push, voice],
+    [loading, messages, push, voice, ttsVoice],
   );
 
   const confirm = useCallback(async () => {
@@ -84,12 +87,12 @@ export function NexusWidget() {
       });
       const data = (await res.json().catch(() => ({ reply: 'Falhou.' }))) as ChatResponse;
       push({ role: 'assistant', text: data.reply });
-      void voice.speak(data.reply);
+      void voice.speak(data.reply, ttsVoice);
     } finally {
       setPending(null);
       setLoading(false);
     }
-  }, [pending, loading, push, voice]);
+  }, [pending, loading, push, voice, ttsVoice]);
 
   const cancel = useCallback(() => {
     setPending(null);
@@ -124,13 +127,28 @@ export function NexusWidget() {
           <span className="text-sm font-semibold text-neutral-100">Nexus</span>
           <Visualizer active={voice.recording || loading} />
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="text-neutral-400 hover:text-neutral-100"
-        >
-          ×
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={ttsVoice}
+            onChange={(e) => setTtsVoice(e.target.value)}
+            aria-label="Voz do Nexus (MiniMax)"
+            title="Voz do Nexus (aplica ao provedor MiniMax)"
+            className="max-w-[8rem] rounded-md border border-neutral-700 bg-neutral-800 px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-emerald-500"
+          >
+            {MINIMAX_PT_VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-neutral-400 hover:text-neutral-100"
+          >
+            ×
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3 text-sm">

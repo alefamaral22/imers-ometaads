@@ -23,6 +23,11 @@ export const confirmRequestSchema = z.object({
 
 export const ttsRequestSchema = z.object({
   text: z.string().trim().min(1).max(2000),
+  // Opcionais (MiniMax): a voz é validada por allowlist no domínio; speed/pitch/vol são clampados.
+  voice: z.string().trim().max(64).optional(),
+  speed: z.number().min(0.5).max(2).optional(),
+  pitch: z.number().int().min(-12).max(12).optional(),
+  vol: z.number().min(0.1).max(10).optional(),
 });
 
 export const captureRequestSchema = z.object({

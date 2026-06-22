@@ -31,9 +31,16 @@ declare namespace NodeJS {
     readonly CLOUDFLARE_TURNSTILE_SITE_KEY?: string;
     readonly CLOUDFLARE_TURNSTILE_SECRET_KEY?: string;
 
-    // ElevenLabs
+    // TTS (provedor plugável — default 'elevenlabs')
+    readonly TTS_PROVIDER?: string; // 'elevenlabs' | 'minimax'
+
+    // ElevenLabs (provider elevenlabs)
     readonly ELEVENLABS_API_KEY?: string;
     readonly ELEVENLABS_VOICE_ID?: string;
+
+    // MiniMax (provider minimax)
+    readonly MINIMAX_API_KEY?: string;
+    readonly MINIMAX_VOICE_ID?: string;
 
     // Picovoice
     readonly PICOVOICE_ACCESS_KEY?: string;

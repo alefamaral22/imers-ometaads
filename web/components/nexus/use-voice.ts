@@ -13,7 +13,7 @@ export interface UseVoice {
   busy: boolean;
   startRecording: () => Promise<void>;
   stopAndTranscribe: () => Promise<string | null>;
-  speak: (text: string) => Promise<void>;
+  speak: (text: string, voice?: string) => Promise<void>;
 }
 
 export function useVoice(): UseVoice {
@@ -68,12 +68,12 @@ export function useVoice(): UseVoice {
     }
   }, []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, voice?: string) => {
     try {
       const res = await fetch('/api/nexus/tts', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(voice ? { text, voice } : { text }),
       });
       if (!res.ok) return; // TTS indisponível → degrada para texto
       const buf = await res.arrayBuffer();

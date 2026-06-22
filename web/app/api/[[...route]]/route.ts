@@ -180,7 +180,12 @@ app.post('/nexus/tts', async (c) => {
   const parsed = ttsRequestSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
   try {
-    const audio = await synthesize(parsed.data.text);
+    const audio = await synthesize(parsed.data.text, {
+      voice: parsed.data.voice,
+      speed: parsed.data.speed,
+      pitch: parsed.data.pitch,
+      vol: parsed.data.vol,
+    });
     return c.body(audio, 200, { 'content-type': 'audio/mpeg' });
   } catch (err) {
     if (err instanceof NexusUnavailableError) return c.json({ error: 'tts_unavailable' }, 503);
