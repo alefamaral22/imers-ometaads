@@ -21,7 +21,7 @@ entre planos; só polling + claim atômico + idempotência.
 
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo). **Próxima: Onda 10 (tracking Worker).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly). |
+| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo) + **10 ✅** (tracking Worker). **Próxima: Onda 11 (hardening + CI/CD).** ⚠️ Falta validar `supabase db reset` ao vivo; runner/skills/dashboard/Nexus/Worker não exercitados ao vivo (credenciais vazias; sem `docker build`/deploy Fly nem `wrangler deploy`). |
 | **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
 | **.env.local** | Criado — **esqueleto com placeholders vazios**. ⚠️ Nenhuma credencial preenchida. |
 | **Tooling** | lint / typecheck / test **verdes**. |
@@ -313,5 +313,24 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   `scripts/send-email.cjs` (Resend, **fail-safe** log-only).
 - Docs: spec landing-editor-and-autonomous, ADR 0019 (modo autônomo) + 0020 (live review), threat model.
 - ⚠️ Não exercitado ao vivo (sem credenciais/Playwright/Resend); lógica de decisão 100% testada.
-### Onda 10 — Tracking (Worker) ⏳
+### Onda 10 — Tracking server-side (Cloudflare Worker) ✅ (commit nesta onda)
+- Workspace `worker/track` (npm workspace `@template/worker-track`): Worker servindo `POST /e` em
+  `track.example.com`, espelho **NO-PII** em `lp_events` e fan-out CAPI/GA4.
+- Lógica pura testável (gate raiz, **35 testes**): `domain/` — `origin` (CORS deny-by-default,
+  boundary por ponto anti look-alike), `event` (parse/validação hand-rolled, allowlist de
+  `event_type`, opcional inválido→null, strip de control-chars por codepoint), `pii` (normalização
+  p/ hash + flags de presença), `ratelimit` (janela fixa pura), `lp-event-row` (**fronteira de PII**:
+  enumera só colunas NO-PII; teste falha se surgir chave de PII). `application/` — `fanout` (builders
+  CAPI v21 + GA4 MP, destinos fixos anti-SSRF, PII só hasheada, Google Ads via importação GA4 c/
+  `gclid`), `handle-event` (orquestra com ports; mirror awaited+idempotente, efeitos em background
+  fail-safe).
+- Infra (glue Cloudflare, lint+prettier ok; fora do typecheck/test do gate raiz): `worker.ts` (fetch
+  handler, IP/país da borda, `ctx.waitUntil`), `crypto` (SHA-256 Web Crypto), `supabase` (upsert
+  `lp_events` REST `on_conflict=event_id`), `d1` (`INSERT OR IGNORE`, só hashes), `dispatch`
+  (`allSettled`). `wrangler.toml` (route `track.example.com`, KV `RATE_LIMIT`, D1 `TRACK_DB`, vars) +
+  `schema.sql` (D1) + README.
+- **Decisões:** lógica hand-rolled sem deps externas (como `scripts/*`) → coberta pelo vitest raiz sem
+  `wrangler`/miniflare; segredos via `wrangler secret` (nunca no `.toml`); Google Ads via GA4
+  (evita Google Ads API/OAuth no Worker). Docs: SPEC-015, ADR 0021, threat model `landing-page-tracking`.
+- ⚠️ Não exercitado ao vivo (sem bindings KV/D1 nem `wrangler deploy`); lógica 100% testada.
 ### Onda 11 — Hardening + CI/CD ⏳

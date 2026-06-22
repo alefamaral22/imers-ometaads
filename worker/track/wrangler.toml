@@ -1,0 +1,29 @@
+# Cloudflare Worker de tracking (Onda 10 / ADR 0021 / SPEC-015).
+# Segredos (NUNCA aqui): SUPABASE_SECRET_KEY, META_CAPI_TOKEN, GA4_API_SECRET — usar `wrangler secret put`.
+name = "track"
+main = "src/infrastructure/worker.ts"
+compatibility_date = "2026-06-01"
+workers_dev = false
+
+# Domínio próprio first-party (resistente a ad-blockers). Ajustar ao personalizar o template.
+routes = [{ pattern = "track.example.com", custom_domain = true }]
+
+[vars]
+ALLOWED_ORIGIN_SUFFIX = "example.com"
+RATE_LIMIT_MAX = "60"
+RATE_LIMIT_WINDOW_MS = "60000"
+# Não-secretos (preencher por deploy): SUPABASE_URL, META_PIXEL_ID, GA4_MEASUREMENT_ID.
+SUPABASE_URL = "https://REPLACE.supabase.co"
+# META_PIXEL_ID = ""
+# GA4_MEASUREMENT_ID = ""
+
+# Rate limit por IP (janela fixa).
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Registro server-side (hashes, NUNCA PII crua) + idempotência por event_id.
+[[d1_databases]]
+binding = "TRACK_DB"
+database_name = "track"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
