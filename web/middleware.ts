@@ -31,6 +31,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // Forward the nonce to Server Components via request headers so they can tag inline scripts.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // O Next.js lê o nonce a partir do header `Content-Security-Policy` da REQUISIÇÃO para injetá-lo
+  // nos próprios <script> dele. Sem isto, com `strict-dynamic` (produção), os scripts do Next ficam
+  // sem nonce → o browser os bloqueia → a página não hidrata (o botão de login nunca habilita).
+  requestHeaders.set('Content-Security-Policy', headers['Content-Security-Policy'] ?? '');
 
   const authSecret = process.env.AUTH_SECRET ?? '';
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
