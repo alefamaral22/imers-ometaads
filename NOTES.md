@@ -19,13 +19,47 @@ entre planos; só polling + claim atômico + idempotência.
 
 ## 2. Status atual
 
+> **Duas dimensões distintas:** (A) **Build do código** = Ondas 0→11 **100% completas** (gates
+> locais verdes). (B) **Go-live (produção)** = em andamento (~70%), rastreado em
+> `docs/how-to/go-live.md` (6 fases). NÃO confundir "build completo" com "no ar".
+
+### A) Build do código — Ondas 0→11 ✅
+
 | Item | Estado |
 |---|---|
-| **Onda atual** | Ondas 0,1 ✅ + **2, 6 ✅** + **8 ✅ (completa: pacote+template+skills create/publish)** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação + vendas) + **7 ✅** (Nexus voz/chat) + **9 ✅** (editor LP + modo autônomo) + **10 ✅** (tracking Worker) + **11 ✅** (hardening + CI/CD). **Build completo (Ondas 0→11).** ✅ **Banco real provisionado** (Supabase `yjmngxsdfsxtzjastvwi`): 20 tabelas c/ RLS + RPCs (`claim_agent_job`/`claim_autonomous_watch`/`set_updated_at`) + 4 buckets (`ad-ingest`/`landing-assets` públicos, `creatives`/`nexus-review` privados) + seed `cliente-exemplo` (cap 5000 cents, BRL) — **aceite da Onda 1 validado ao vivo via MCP** (não precisou `db reset`). ⚠️ Falta: preencher `SUPABASE_SECRET_KEY` no `web/.env.local`; runner/skills/Nexus/Worker não exercitados ao vivo (sem deploy Fly/`wrangler`); CI/deploy não rodaram em GitHub real ainda. |
-| **Repo git** | Inicializado em `main`. 3 commits atômicos. (Sem remote ainda.) |
-| **.env.local** | Raiz: esqueleto (Supabase/Claude/OpenAI ainda vazios). **`web/.env.local` criado** p/ rodar o dashboard (Next lê de `web/`): Supabase URL + publishable key preenchidas via MCP, `AUTH_SECRET` gerado, senha temp `nexus-local`. ⚠️ Falta colar `SUPABASE_SECRET_KEY` (service_role). |
-| **Tooling** | lint / typecheck / test **verdes**. |
-| **Dependências npm** | Instaladas (153 pkgs). 5 vulnerabilidades (devDeps transitivas) → adiadas p/ Onda 11. |
+| **Ondas** | 0,1 ✅ + **2 ✅** + **3 ✅** (runner Fly) + **4 ✅** (analytics) + **5 ✅** (ativação+vendas) + **6 ✅** (dashboard) + **7 ✅** (Nexus voz/chat) + **8 ✅** (LP pacote+template+skills) + **9 ✅** (editor LP + autônomo) + **10 ✅** (tracking Worker) + **11 ✅** (hardening+CI/CD). |
+| **Banco real** | Supabase `yjmngxsdfsxtzjastvwi`: 20 tabelas c/ RLS + RPCs + 4 buckets + seed `cliente-exemplo` (cap 5000 cents, BRL). Aceite da Onda 1 validado ao vivo via MCP. |
+| **Tooling** | lint / typecheck / test (211+) / format / `next build` **verdes**. |
+
+### B) Go-live (produção) — em andamento (atualizado 2026-06-23)
+
+Mapeamento das 6 fases do `docs/how-to/go-live.md`:
+
+| Fase | Estado |
+|---|---|
+| 0 — Remote GitHub + CLIs | ⚠️ **Sem remote ainda** (git só local em `main`) → CI/CD não dispara |
+| 1 — Supabase | ✅ Provisionado, validado, `SECRET_KEY` distribuído |
+| 2 — **Runner Fly** (`imers-ometaads`, gru) | ✅ **No ar 24/7** (build local; supercronic + pollers 1/min). Skills no `/app/.claude/skills`. |
+| 3 — Primeiro job real | ✅ `job→runner→completed` validado (skill `daily-summary`). 🔄 ciclo Meta enfileirado: ver §10 |
+| 4 — Cloudflare Worker (tracking) | ❌ Não feito |
+| 5 — **Dashboard Vercel** (`meta-ads-dashboard`, `topaz-theta`) | ✅ **No ar**, login + leitura real do Supabase OK (plano Hobby → cron diário) |
+| 6 — CI/CD (secrets GitHub) | ❌ Não feito (depende da fase 0) |
+
+**🟢 Risco rebaixado (2026-06-23):** o **MCP da Meta FUNCIONA no runner** — `claude mcp list` na
+máquina Fly mostra `claude.ai META ADS … ✔ Connected` (via connector de conta do `claude login`, **não**
+via `.mcp.json`; o `.mcp.json` do runner só tem Supabase, que as skills nem usam). A campanha de tráfego
+do `cliente-exemplo` (stamp `20260623-0111`) foi criada **pelo runner** — prova de que `create-traffic`
+roda ponta a ponta no headless. Era a maior incerteza do projeto; está resolvida.
+
+**Bug do criativo (resolvido nesta sessão):** os 3 criativos nasceram como PNG de cor sólida porque a
+`image-generate` caiu em placeholder (não chamou a OpenAI). Diagnosticado, 3 imagens reais regeneradas
+(`gpt-image-1`), 3 criativos novos na Meta + ads repontados (PAUSED), skill endurecida (commit `3720f6e`,
+proíbe placeholder + gera via Node) e **runner redeployado**. Detalhe em [[image-generate-placeholder-gotcha]].
+
+**Pendências do go-live (ordem de prioridade):** (1) validar **ciclo Meta enfileirado** end-to-end
+(`agent_jobs` → claim → campanha PAUSED → `completed`); (2) **remote GitHub** + CI/CD (fases 0/6);
+(3) **Cloudflare Worker** de tracking (fase 4); (4) trocar `example.com` pelo domínio real;
+(5) `.env.example` espelhar `TTS_PROVIDER`/`MINIMAX_*`; (6) rotacionar senha `nexus-local`.
 
 ### Decisões do usuário (fixas para todo o projeto)
 1. **Manter placeholders de template** — `cliente-exemplo`, assistente `Nexus`, agência `Acme`,
@@ -369,3 +403,19 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - **Decisão:** `npm audit` NÃO é gate (devDeps transitivas; `--force` = breaking) — dívida monitorada.
 - ⚠️ CI/deploy ainda não rodaram num GitHub real (sem remote); gates locais 100% verdes
   (lint/typecheck/format/test/test:coverage + `cd web && next build`).
+
+### Go-live — produção (2026-06-22/23) 🔄 em andamento
+- **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
+  builder remoto batia em TLS x509 na rede do operador), `.dockerignore` p/ não copiar `node_modules`
+  do Windows, `IS_SANDBOX=1` no `fly.toml [env]`, fila vazia (row de nulls) tratada como no-job. Claude
+  autenticado via `claude login` (OAuth no volume `claude_oauth`). **Meta MCP conectado de conta** (não
+  `.mcp.json`). ✅ smoke `job→runner→completed` (skill `daily-summary`).
+- **Dashboard Vercel** `meta-ads-dashboard` (`topaz-theta`), plano Hobby → cron diário. Login + leitura
+  real OK. Gotcha CSP-por-nonce: exige header CSP na **requisição** (middleware) **e** render **dinâmico**
+  (`export const dynamic` no `app/layout.tsx`), senão `strict-dynamic` bloqueia a hidratação em prod.
+- **Campanha real** `cliente-exemplo · traffic · 20260623-0111` criada pelo runner (3 ads PAUSED).
+- **Fix criativo:** `image-generate` proibida de placeholder + gera via Node (commit `3720f6e`); 3
+  imagens reais (`gpt-image-1`) + 3 criativos novos na Meta; runner redeployado. Ver
+  [[image-generate-placeholder-gotcha]] e [[deploy-infra-go-live]].
+- ❌ Falta: ciclo Meta **enfileirado** end-to-end; remote GitHub + CI/CD; Worker de tracking; domínio
+  real; `.env.example` espelhar `TTS_PROVIDER`/`MINIMAX_*`; rotacionar senha `nexus-local`.

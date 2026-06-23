@@ -32,10 +32,17 @@ if [[ "${RUNNER_HOOKS:-0}" == "1" && -f ".claude/runner-settings.json" ]]; then
   SETTINGS_ARGS=(--settings .claude/runner-settings.json)
 fi
 
+# Prompt IMPERATIVO (não apenas o caminho da skill). Passar só ".claude/skills/<skill>" é ambíguo: o
+# modelo ora executa, ora apenas RESUME a SKILL.md — e como o exit fica 0 mesmo sem trabalho, o job
+# vira "completed" sem ter feito nada (falso verde). Aqui exigimos execução real, ponta a ponta, e
+# injetamos os AGENT_ARGS (ex.: o stamp) — que antes não chegavam ao prompt.
+ARGS_JSON="${AGENT_ARGS:-{}}"
+PROMPT="Execute headless (sem humano) a skill definida em .claude/skills/${SKILL}/SKILL.md AGORA, por completo: rode TODOS os passos você mesmo e faça as chamadas reais (MCP da Meta, persistência REST, geração de imagem). Isto é um pedido de EXECUÇÃO — NÃO resuma, NÃO explique, NÃO descreva a skill. Args de entrada (JSON): ${ARGS_JSON}. Ao terminar, relate exatamente o que foi criado (IDs Meta + linhas gravadas) ou, se algo falhar, FALHE em voz alta com o erro."
+
 # claude -p com stream-json: a saída é tee-ada para o log e canalizada para a telemetria.
 # pipefail + PIPESTATUS garantem que o exit code reflita o `claude`, não o `tee`/emitter.
 set +e
-claude -p ".claude/skills/${SKILL}" \
+claude -p "$PROMPT" \
   --dangerously-skip-permissions \
   --output-format stream-json \
   --verbose \
