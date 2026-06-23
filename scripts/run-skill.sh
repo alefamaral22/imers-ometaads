@@ -19,6 +19,23 @@ if [[ ! "$SKILL" =~ ^[a-z0-9][a-z0-9-]{0,80}$ ]] || [[ ! -d ".claude/skills/$SKI
   exit 2
 fi
 
+# Pré-condições determinísticas por skill: variáveis de ambiente obrigatórias. Sem elas a skill não
+# tem como executar de verdade (ex.: publish sem credencial Cloudflare). Falhamos AQUI (exit 1) em vez
+# de deixar o claude "abortar narrando" e sair 0 — isso viraria job `completed` sem trabalho (falso
+# verde). Defesa determinística, independente do modelo.
+REQUIRED_ENV=()
+case "$SKILL" in
+  publish-landing-page-*)
+    REQUIRED_ENV=(SUPABASE_URL SUPABASE_SECRET_KEY CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID)
+    ;;
+esac
+for var in "${REQUIRED_ENV[@]}"; do
+  if [[ -z "${!var:-}" ]]; then
+    echo "run-skill: $SKILL precondition failed: \$$var is empty (aborting before claude)" >&2
+    exit 1
+  fi
+done
+
 mkdir -p logs
 STAMP="$(date +%Y%m%d-%H%M%S)"
 LOG="logs/${STAMP}-${SKILL}.log"
