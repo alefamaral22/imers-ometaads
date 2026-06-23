@@ -43,7 +43,7 @@ Mapeamento das 6 fases do `docs/how-to/go-live.md`:
 | 3 — Primeiro job real | ✅ `job→runner→completed` validado (skill `daily-summary`). 🔄 ciclo Meta enfileirado: ver §10 |
 | 4 — Cloudflare Worker (tracking) | ❌ Não feito |
 | 5 — **Dashboard Vercel** (`meta-ads-dashboard`, `topaz-theta`) | ✅ **No ar**, login + leitura real do Supabase OK (plano Hobby → cron diário) |
-| 6 — CI/CD (secrets GitHub) | 🟡 **Quase**: CI verde no push; **deploy auto do Fly validado ao vivo** (workflow_dispatch → `flyctl deploy --remote-only` success, máquina v8). Secrets `FLY_API_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` setados. ⚠️ Falta só `VERCEL_TOKEN` (criar no dashboard Vercel) p/ ligar o deploy auto do dashboard |
+| 6 — CI/CD (secrets GitHub) | ✅ **Completo**: CI verde no push; **deploy auto Fly + Vercel validado ao vivo** (workflow_dispatch → ambos os jobs success). 4 secrets setados (`FLY_API_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`). Push na `main` redeploya runner + dashboard sozinho. ⚠️ `VERCEL_TOKEN` foi colado em texto no chat → **rotacionar** quando der |
 
 **🟢 Risco rebaixado (2026-06-23):** o **MCP da Meta FUNCIONA no runner** — `claude mcp list` na
 máquina Fly mostra `claude.ai META ADS … ✔ Connected` (via connector de conta do `claude login`, **não**
@@ -61,10 +61,9 @@ campanha `OUTCOME_TRAFFIC` **PAUSED** + ad_set + 3 ads + 3 criativos + 3 imagens
 orçamento clampado no teto (631s). Bug do falso-verde do `run-skill.sh` corrigido no caminho — ver
 [[runner-false-green-prompt]].
 
-**Pendências do go-live (ordem de prioridade):** (1) **`VERCEL_TOKEN`** no GitHub p/ fechar o deploy
-auto do dashboard (Fly já automatizado); (2) **Cloudflare Worker** de tracking (fase 4); (3) trocar
-`example.com` pelo domínio real; (4) `.env.example` espelhar `TTS_PROVIDER`/`MINIMAX_*`; (5) rotacionar
-senha `nexus-local`.
+**Pendências do go-live (ordem de prioridade):** (1) **Cloudflare Worker** de tracking (fase 4 — precisa
+conta CF + domínio); (2) trocar `example.com` pelo domínio real; (3) `.env.example` espelhar
+`TTS_PROVIDER`/`MINIMAX_*`; (4) rotacionar senha `nexus-local` e o `VERCEL_TOKEN` (exposto no chat).
 
 ### Decisões do usuário (fixas para todo o projeto)
 1. **Manter placeholders de template** — `cliente-exemplo`, assistente `Nexus`, agência `Acme`,
