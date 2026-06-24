@@ -449,6 +449,35 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - ⚠️ CI/deploy ainda não rodaram num GitHub real (sem remote); gates locais 100% verdes
   (lint/typecheck/format/test/test:coverage + `cd web && next build`).
 
+### Onda 12 — SaaS multi-tenant (schema) ✅ migration aplicada ao vivo (2026-06-24)
+- **Spec aprovada** `docs/specs/SPEC-saas-multitenant.md` (status Approved-design; 4 decisões de §5
+  validadas pelo operador). Migration `supabase/migrations/20260624120000_saas_multitenant.sql`
+  **aplicada via MCP no banco vivo `yjmngxsdfsxtzjastvwi`** (`apply_migration` success).
+- **3 tabelas novas:** `accounts` (tenant pagante: `role` super_admin/socio/cliente_usuario, `plan`,
+  `subscription_status`, ganchos billing/auth), `ad_account_connections` (1/conta Meta; `connection_method`
+  enum `manual_token`|`oauth_meta`; token cifrado `access_token_cipher bytea` + `last4` + `status`/
+  `last_validated_at`), `api_keys_clientes` (chave de provedor por account, cifrada, `unique(account_id,provider)`).
+- **Alterações:** `clients` ganhou `account_id` NOT NULL (FK cascade); slug deixou de ser único global →
+  `unique(account_id, slug)` (`clients_slug_key` dropada, `clients_account_slug_uniq` criada);
+  `ad_account_id` segue único global (anti-hijack). `agent_jobs` ganhou `account_id` (nullable, conveniência).
+- **7 enums novos** (`account_role`/`account_plan`/`subscription_status`/`connection_method`/
+  `connection_status`/`api_key_provider`/`api_key_status`). `oauth_meta` no enum **SEM código** (decisão
+  consciente: precisa Business Verification + App Review = fase 2). RLS deny-by-default nas 3 novas.
+- **Backfill verificado:** account-âncora `acme` (super_admin) criada; `clients` órfãos=0 (1/1),
+  `agent_jobs` sem account=0 (7/7). Advisor de segurança: só `rls_enabled_no_policy` INFO (esperado pelo
+  design deny-by-default), zero WARN/ERROR.
+- **Decisões validadas:** isolamento = Opção A (escopo na app `withAccount()`, RLS real como fast-follow);
+  fallback de chave = `super_admin` usa global, demais exigem chave própria (senão job aborta); cripto =
+  AES-256-GCM app-level com **chaves separadas** (`AD_TOKEN_ENC_KEY`/`API_KEY_ENC_KEY`); validação de token
+  1×/dia + sob falha. **Mudança arquitetural a implementar depois:** runner passa a chamar Meta com token
+  do tenant (REST), não só o MCP-connector compartilhado (ADR 0028).
+- **Docs estruturais ✅:** ADR 0026 (multi-tenancy/isolamento), 0027 (segredos cifrados +
+  `resolveProviderKey`), 0028 (Meta por token manual; OAuth = fase 2) + threat model STRIDE
+  `docs/security/threats/saas-multitenant.md`.
+- ⚠️ **Pendente (código, não feito):** helpers cripto AES-256-GCM + `resolveProviderKey` (lógica pura
+  testável), skill `validate-connections-tick`, ajuste runner (`run-skill.sh` injeta chaves do tenant),
+  serviços/telas do dashboard + acessador `withAccount`. Spec §9 tem o plano. Nada commitado ainda.
+
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
   builder remoto batia em TLS x509 na rede do operador), `.dockerignore` p/ não copiar `node_modules`
