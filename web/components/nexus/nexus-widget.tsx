@@ -63,12 +63,19 @@ export function NexusWidget() {
         if (res.status === 503) {
           push({
             role: 'assistant',
-            text: 'Nexus indisponível: configure CLAUDE_API_KEY no servidor.',
+            text: 'Nexus indisponível no momento — tente de novo em instantes.',
+          });
+          return;
+        }
+        if (res.status === 429) {
+          push({
+            role: 'assistant',
+            text: 'Muitas mensagens em pouco tempo — aguarde alguns segundos e repita.',
           });
           return;
         }
         if (!res.ok) {
-          push({ role: 'assistant', text: 'Não consegui processar agora.' });
+          push({ role: 'assistant', text: 'Não consegui processar agora — tente de novo.' });
           return;
         }
         const data = (await res.json()) as ChatResponse;

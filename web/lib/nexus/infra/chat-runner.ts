@@ -42,8 +42,8 @@ function textOf(content: AnthropicContentBlock[]): string {
     .trim();
 }
 
-function firstToolUse(content: AnthropicContentBlock[]): AnthropicToolUseBlock | null {
-  return content.find((b): b is AnthropicToolUseBlock => b.type === 'tool_use') ?? null;
+function toolUses(content: AnthropicContentBlock[]): AnthropicToolUseBlock[] {
+  return content.filter((b): b is AnthropicToolUseBlock => b.type === 'tool_use');
 }
 
 /** Executa uma tool de leitura no servidor (read-only) e devolve um JSON string como tool_result. */
@@ -105,64 +105,78 @@ export async function confirmAndEnqueue(input: {
   return { reply, job: result };
 }
 
+/** Monta a pendência (escrita = só PROPÕE) a partir do bloco tool_use de enqueue_job. */
+function proposeWrite(tool: AnthropicToolUseBlock, leadingText: string): ChatResult {
+  const slug = typeof tool.input.slug === 'string' ? tool.input.slug : '';
+  const { slug: _omit, ...args } = tool.input;
+  void _omit;
+  const id = globalThis.crypto.randomUUID();
+  const pending: PendingAction | null = buildPendingAction(slug, args, { id });
+  if (pending === null) {
+    return { reply: 'Não reconheci essa ação (slug fora da allowlist). Nada foi feito.' };
+  }
+  const reply = [leadingText, pending.summary].filter(Boolean).join(' ');
+  return {
+    reply: reply || pending.summary,
+    pending: {
+      id: pending.id,
+      slug: pending.slug,
+      summary: pending.summary,
+      args: compactArgs(pending.args),
+    },
+  };
+}
+
+const MAX_TOOL_ROUNDS = 5;
+
 /**
- * Turno 1: chama o modelo com as tools. Read → executa e responde; Write (enqueue_job) → PROPÕE uma
- * pendência (não age) para confirmação no turno 2. Texto puro → resposta direta.
+ * Turno do chat com LOOP agêntico. A cada rodada o modelo pode: usar tools de LEITURA (executadas no
+ * servidor; o resultado volta como tool_result e o loop continua), PROPOR uma escrita (enqueue_job →
+ * pendência, encerra para confirmação) ou responder texto (encerra). Trata TODOS os tool_use de uma
+ * rodada (a Anthropic exige um tool_result por tool_use). Limite de rodadas evita laço infinito.
  */
 export async function runChatTurn(input: {
   message: string;
   history: Turn[];
 }): Promise<ChatResult> {
   const system = buildSystemPrompt();
-  const baseMessages: AnthropicMessage[] = [
+  const messages: AnthropicMessage[] = [
     ...historyToMessages(input.history),
     { role: 'user', content: input.message },
   ];
 
-  const first = await callMessages({ system, messages: baseMessages, tools: ALL_TOOLS });
-  const tool = firstToolUse(first.content);
+  let lastText = '';
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const resp = await callMessages({ system, messages, tools: ALL_TOOLS });
+    const text = textOf(resp.content);
+    if (text) lastText = text;
+    const uses = toolUses(resp.content);
 
-  if (tool === null) {
-    return { reply: textOf(first.content) || '…' };
-  }
-
-  const kind = classifyTool(tool.name);
-
-  if (kind === 'write') {
-    const slug = typeof tool.input.slug === 'string' ? tool.input.slug : '';
-    const { slug: _omit, ...args } = tool.input;
-    void _omit;
-    const id = globalThis.crypto.randomUUID();
-    const pending: PendingAction | null = buildPendingAction(slug, args, { id });
-    if (pending === null) {
-      return { reply: 'Não reconheci essa ação (slug fora da allowlist). Nada foi feito.' };
+    if (uses.length === 0) {
+      return { reply: lastText || '…' };
     }
-    const reply = [textOf(first.content), pending.summary].filter(Boolean).join(' ');
-    return {
-      reply: reply || pending.summary,
-      pending: {
-        id: pending.id,
-        slug: pending.slug,
-        summary: pending.summary,
-        args: compactArgs(pending.args),
-      },
-    };
+
+    // Escrita tem prioridade e encerra o turno (propõe a pendência para confirmação).
+    const write = uses.find((u) => classifyTool(u.name) === 'write');
+    if (write) {
+      return proposeWrite(write, text);
+    }
+
+    // Caso contrário, executa TODAS as leituras desta rodada e devolve um tool_result por tool_use.
+    const results = await Promise.all(
+      uses.map(async (u) => ({
+        type: 'tool_result' as const,
+        tool_use_id: u.id,
+        content:
+          classifyTool(u.name) === 'read'
+            ? await executeReadTool(u.name, u.input)
+            : JSON.stringify({ error: 'unknown_tool' }),
+      })),
+    );
+    messages.push({ role: 'assistant', content: resp.content });
+    messages.push({ role: 'user', content: results });
   }
 
-  if (kind === 'read') {
-    const toolResult = await executeReadTool(tool.name, tool.input);
-    const messages: AnthropicMessage[] = [
-      ...baseMessages,
-      { role: 'assistant', content: first.content },
-      {
-        role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: tool.id, content: toolResult }],
-      },
-    ];
-    const second = await callMessages({ system, messages, tools: ALL_TOOLS });
-    return { reply: textOf(second.content) || '…' };
-  }
-
-  // tool desconhecida → ignorada (deny-by-default).
-  return { reply: textOf(first.content) || 'Não foi possível executar essa ação.' };
+  // Esgotou as rodadas sem uma resposta final — devolve o melhor texto que houve.
+  return { reply: lastText || 'Não consegui concluir agora — tente de novo.' };
 }

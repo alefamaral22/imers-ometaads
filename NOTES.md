@@ -414,6 +414,13 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   orçamento, objetivo, `meta_campaign_id`; filtro opcional por client_slug) + prompt orientado a
   consultá-las. **Limite por design:** o Nexus só "vê" o que as skills criaram/persistiram no banco; para
   enxergar campanhas que existem só na Meta seria preciso uma skill de **sync** no runner (não construída).
+- **Erro "Não consegui processar agora" (corrigido):** o chat caía nesse erro porque (a) `callMessages`
+  lançava erro cru em QUALQUER resposta não-OK da Anthropic e a rota só tratava `NexusUnavailableError`
+  (→ 500), sem retry — um "overloaded" (529) transitório derrubava o turno; e (b) o `runChatTurn` só
+  tratava UMA rodada de tool, mas o prompt agora manda consultar get_clients/get_campaigns antes de agir
+  (2+ idas ao modelo) → a proposta de ação na 2ª rodada era perdida. Fix: **retry** de status transitórios
+  (429/500/502/503/529 + falha de rede, backoff) virando 503 amigável; **loop agêntico** (até 5 rodadas,
+  trata todos os tool_use por rodada). Widget: mensagens distintas p/ 503 e 429.
 - ⚠️ **Ação de config pendente (fora do código):** setar na **Vercel** as envs `CLAUDE_API_KEY`,
   `OPENAI_API_KEY`, `TTS_PROVIDER=minimax`, `MINIMAX_API_KEY`, `MINIMAX_VOICE_ID` (ex.:
   `Portuguese_Solemn_Narrator_v1`) e **redeployar** — sem isso a voz degrada para texto em produção.
