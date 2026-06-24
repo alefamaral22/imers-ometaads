@@ -53,3 +53,20 @@ A lógica do MiniMax fica **pura e testada** em `lib/nexus/domain/tts.ts`: monta
 (`base_resp.status_code === 0`) e decodificação do áudio (a MiniMax devolve **HEX** → MP3). A voz é
 resolvida por **allowlist deny-by-default** (request > `MINIMAX_VOICE_ID` > `Portuguese_Solemn_Narrator_v1`);
 o widget tem um seletor das vozes PT. `isTtsEnabled` passou a considerar o provedor ativo.
+
+## Atualização — Modo mãos-livres (escuta contínua com VAD)
+
+O push-to-talk ganhou um modo **mãos-livres**: um toggle abre o microfone e o Nexus passa a conversar
+em tempo real — o operador fala quando quiser, o assistente responde por voz e **volta a escutar
+sozinho**, sem apertar nada entre as falas. A detecção de começo/fim de cada fala é por **VAD** (Voice
+Activity Detection) baseado no nível de áudio (RMS via `AnalyserNode` da Web Audio API): silêncio
+sustentado após fala suficiente encerra a utterance, que é então transcrita (mesmo endpoint
+`/api/nexus/stt`) e vira um turno.
+
+A **decisão é pura e testada** em `lib/nexus/domain/vad.ts` (máquina de estados `idle→speaking→trailing`,
+`vadStep`/`rmsFromTimeDomain`, descarta ruído curto, teto duro por utterance); a captura
+(`AnalyserNode`/`MediaRecorder`) fica no hook `use-voice`. **Anti-eco:** a escuta auto-pausa enquanto o
+Nexus fala (`speak` resolve só quando o áudio termina) e durante o processamento do turno, evitando que
+o assistente transcreva a própria voz. Tudo continua **degradando para texto** quando STT/TTS faltam
+(503) e respeitando o contrato de segurança (fala = dado, não instrução; escrita só enfileira com
+confirmação em dois turnos). Wake-word (Picovoice) segue como drop-in futuro por cima deste modo.

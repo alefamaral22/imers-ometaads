@@ -386,6 +386,28 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   `ttsRequestSchema` aceita voice/speed/pitch/vol; widget ganhou seletor de voz PT (default
   `Portuguese_Solemn_Narrator_v1`). `isTtsEnabled` considera o provedor ativo. ADR 0011 atualizado.
 - Gates verdes: lint, typecheck (raiz + web), 211 testes, format, `cd web && next build`.
+### Pós-Onda 11 — Nexus mãos-livres (conversa por voz contínua / VAD) ✅ (commit nesta sessão)
+- **Sintoma do operador:** "o chat só funciona por texto". **Diagnóstico:** (1) o código já fala — TTS
+  MiniMax é o default e `nexus-widget` chama `voice.speak` em toda resposta; o "só texto" vem da
+  **degradação silenciosa** quando as chaves de voz **não estão setadas no env da Vercel** (STT precisa
+  `OPENAI_API_KEY`; TTS precisa `MINIMAX_API_KEY`+`TTS_PROVIDER=minimax`; chat precisa `CLAUDE_API_KEY`).
+  Localmente as chaves existem em `web/.env.local`. (2) **Mãos-livres não existia** — só push-to-talk.
+- **Construído:** modo **mãos-livres** com **VAD** (escuta contínua). Núcleo puro testável
+  `web/lib/nexus/domain/vad.ts` (`vadStep` máquina `idle→speaking→trailing`, `rmsFromTimeDomain`,
+  `DEFAULT_VAD_CONFIG`; descarta ruído curto + teto duro; **9 testes**). Hook `use-voice` ganhou
+  `startHandsFree`/`stopHandsFree`/`setHandsFreePaused`/`transcribeBlob` + `speaking`/`listening`:
+  abre o mic via `AnalyserNode` (Web Audio), amostra RMS a cada 50ms, grava o segmento entre
+  `speech-start`/`utterance-end`, transcreve e dispara o turno. **Anti-eco:** `speak` agora resolve só
+  quando o áudio TERMINA e a escuta auto-pausa enquanto o Nexus fala/processa. Widget ganhou o toggle
+  "Mãos-livres" + indicador de estado (Ouvindo/Processando/Falando); push-to-talk fica oculto no modo ON.
+- Gates verdes: lint, typecheck (raiz + web), **229 testes**, `cd web && npm run build`. Docs: SPEC-016
+  (entregáveis+aceite) e ADR 0011 atualizados.
+- ⚠️ **Ação de config pendente (fora do código):** setar na **Vercel** as envs `CLAUDE_API_KEY`,
+  `OPENAI_API_KEY`, `TTS_PROVIDER=minimax`, `MINIMAX_API_KEY`, `MINIMAX_VOICE_ID` (ex.:
+  `Portuguese_Solemn_Narrator_v1`) e **redeployar** — sem isso a voz degrada para texto em produção.
+  Mic exige **HTTPS** (a Vercel já é). `.env.local` raiz tem `MINIMAX_VOICE_ID` inválido (ignorado; o web
+  usa `web/.env.local`, correto).
+
 ### Onda 11 — Hardening, observabilidade & CI/CD ✅ (commit nesta onda)
 - **CI** `.github/workflows/ci.yml` (push/PR, gate de merge): jobs `quality` (npm ci → format → lint
   → typecheck → `test:coverage`), `web-build` (typecheck + `next build` do workspace web com

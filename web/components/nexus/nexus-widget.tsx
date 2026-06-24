@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useVoice } from './use-voice';
 import { Visualizer } from './visualizer';
 import { DEFAULT_MINIMAX_VOICE, MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
@@ -24,9 +24,12 @@ interface ChatResponse {
 }
 
 /**
- * Widget do Nexus (client). Chat por texto e voz; tools de escrita exigem CONFIRMAÇÃO em dois turnos
- * (barra Confirmar/Cancelar) antes de enfileirar um job. Degrada para texto quando a voz/IA não
- * estão configuradas no servidor (respostas 503 viram mensagem amigável).
+ * Widget do Nexus (client). Chat por texto e voz. Dois modos de voz:
+ *  - **Push-to-talk** (🎤): aperta para falar, aperta de novo para enviar.
+ *  - **Mãos-livres**: escuta contínua com VAD — fala quando quiser, o Nexus responde por voz e volta a
+ *    ouvir sozinho (sem apertar nada entre as falas). Anti-eco: a escuta pausa enquanto o Nexus fala.
+ * Tools de escrita exigem CONFIRMAÇÃO em dois turnos antes de enfileirar um job. Degrada para texto
+ * quando a voz/IA não estão configuradas no servidor (respostas 503 viram mensagem amigável).
  */
 export function NexusWidget() {
   const [open, setOpen] = useState(false);
@@ -40,13 +43,16 @@ export function NexusWidget() {
 
   const push = useCallback((m: ChatMsg) => setMessages((prev) => [...prev, m]), []);
 
+  // Envia uma mensagem ao Nexus e FALA a resposta. Resolve só quando o áudio termina, para que o
+  // loop de mãos-livres só volte a escutar depois que o Nexus parar de falar.
   const send = useCallback(
-    async (text: string) => {
+    async (text: string): Promise<void> => {
       const trimmed = text.trim();
       if (trimmed.length === 0 || loading) return;
       push({ role: 'user', text: trimmed });
       setInput('');
       setLoading(true);
+      let reply: string | null = null;
       try {
         const history = messages.map((m) => ({ role: m.role, content: m.text }));
         const res = await fetch('/api/nexus/chat', {
@@ -68,17 +74,48 @@ export function NexusWidget() {
         const data = (await res.json()) as ChatResponse;
         push({ role: 'assistant', text: data.reply });
         setPending(data.pending ?? null);
-        void voice.speak(data.reply, ttsVoice);
+        reply = data.reply;
       } finally {
         setLoading(false);
       }
+      // Fala fora do bloco de loading: a UI já liberou, mas o caller (mãos-livres) aguarda o áudio.
+      if (reply) await voice.speak(reply, ttsVoice);
     },
     [loading, messages, push, voice, ttsVoice],
   );
 
+  // Mãos-livres: cada fala detectada vira um turno. Pausa a escuta durante o processamento (anti-eco
+  // e evita turnos sobrepostos); a retomada acontece após o Nexus terminar de falar (send aguarda o TTS).
+  const handleUtterance = useCallback(
+    async (blob: Blob): Promise<void> => {
+      voice.setHandsFreePaused(true);
+      try {
+        const text = await voice.transcribeBlob(blob);
+        if (text && text.trim()) await send(text);
+      } finally {
+        voice.setHandsFreePaused(false);
+      }
+    },
+    [voice, send],
+  );
+
+  // Wrapper estável: o hook guarda o callback no início do modo; usamos um ref para sempre chamar a
+  // versão mais recente (com o histórico de mensagens atualizado), sem reiniciar a escuta.
+  const handleUtteranceRef = useRef(handleUtterance);
+  useEffect(() => {
+    handleUtteranceRef.current = handleUtterance;
+  }, [handleUtterance]);
+  const stableOnUtterance = useCallback((blob: Blob) => handleUtteranceRef.current(blob), []);
+
+  const toggleHandsFree = useCallback(async () => {
+    if (voice.handsFree) voice.stopHandsFree();
+    else await voice.startHandsFree(stableOnUtterance);
+  }, [voice, stableOnUtterance]);
+
   const confirm = useCallback(async () => {
     if (!pending || loading) return;
     setLoading(true);
+    let reply: string | null = null;
     try {
       const res = await fetch('/api/nexus/confirm', {
         method: 'POST',
@@ -87,11 +124,12 @@ export function NexusWidget() {
       });
       const data = (await res.json().catch(() => ({ reply: 'Falhou.' }))) as ChatResponse;
       push({ role: 'assistant', text: data.reply });
-      void voice.speak(data.reply, ttsVoice);
+      reply = data.reply;
     } finally {
       setPending(null);
       setLoading(false);
     }
+    if (reply) await voice.speak(reply, ttsVoice);
   }, [pending, loading, push, voice, ttsVoice]);
 
   const cancel = useCallback(() => {
@@ -107,6 +145,15 @@ export function NexusWidget() {
       await voice.startRecording();
     }
   }, [voice, send]);
+
+  // Texto de estado do modo mãos-livres.
+  const hfStatus = voice.speaking
+    ? 'Nexus falando…'
+    : loading || voice.busy
+      ? 'Processando…'
+      : voice.listening
+        ? 'Ouvindo… pode falar'
+        : 'Mãos-livres ligado';
 
   if (!open) {
     return (
@@ -125,7 +172,7 @@ export function NexusWidget() {
       <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-neutral-100">Nexus</span>
-          <Visualizer active={voice.recording || loading} />
+          <Visualizer active={voice.recording || voice.listening || voice.speaking || loading} />
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -151,9 +198,38 @@ export function NexusWidget() {
         </div>
       </header>
 
+      {voice.supported ? (
+        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
+          <button
+            type="button"
+            onClick={toggleHandsFree}
+            aria-pressed={voice.handsFree}
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+              voice.handsFree
+                ? 'bg-emerald-500 text-neutral-950 hover:bg-emerald-400'
+                : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'
+            }`}
+          >
+            <span aria-hidden>{voice.handsFree ? '🟢' : '🎙️'}</span>
+            {voice.handsFree ? 'Mãos-livres ON' : 'Mãos-livres'}
+          </button>
+          {voice.handsFree ? (
+            <span
+              className={`text-xs ${voice.listening ? 'text-emerald-300' : 'text-neutral-400'}`}
+              aria-live="polite"
+            >
+              {hfStatus}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3 text-sm">
         {messages.length === 0 ? (
-          <p className="text-neutral-500">Pergunte algo (ex.: “analisar cliente-exemplo”).</p>
+          <p className="text-neutral-500">
+            Pergunte algo (ex.: “analisar cliente-exemplo”). Ligue o modo mãos-livres para conversar
+            por voz sem apertar nada.
+          </p>
         ) : (
           messages.map((m, i) => (
             <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
@@ -200,7 +276,7 @@ export function NexusWidget() {
         }}
         className="flex items-center gap-2 border-t border-neutral-800 px-3 py-2"
       >
-        {voice.supported ? (
+        {voice.supported && !voice.handsFree ? (
           <button
             type="button"
             onClick={toggleMic}

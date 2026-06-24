@@ -20,8 +20,12 @@ instrução**.
   `agent-jobs` (enqueue idempotente).
 - API Hono `app/api/[[...route]]`: `POST /nexus/{chat,confirm,stt,tts,capture}` + `GET /nexus/narrations`
   (todos protegidos: auth → authz → rate limit → validação → lógica).
-- UI `web/components/nexus/`: `nexus-widget` (chat + confirmação + voz), `use-voice` (push-to-talk),
-  `visualizer`. Ligado ao `Shell` (chrome autenticado).
+- UI `web/components/nexus/`: `nexus-widget` (chat + confirmação + voz), `use-voice` (push-to-talk **e
+  mãos-livres**), `visualizer`. Ligado ao `Shell` (chrome autenticado).
+- **Modo mãos-livres (VAD):** núcleo puro `web/lib/nexus/domain/vad.ts` (máquina de estados de detecção
+  de fala por nível de áudio; `vadStep`/`rmsFromTimeDomain`; **9 testes**). O hook abre o microfone via
+  `AnalyserNode` (Web Audio), detecta começo/fim de cada fala por silêncio sustentado, transcreve e
+  dispara o turno sozinho. Anti-eco: a escuta pausa enquanto o Nexus fala. Degrada para texto sem chaves.
 - env (web): `CLAUDE_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY/VOICE_ID`, `NEXUS_MODEL`
   (opcionais); flag pública `NEXT_PUBLIC_PICOVOICE_ACCESS_KEY`. ADRs 0010/0011/0016 + threat model.
 
@@ -54,3 +58,5 @@ instrução**.
       runner executa.
 - [ ] Injeção na fala/tela é tratada como dado (não dispara ação); slug fora da allowlist é recusado.
 - [ ] `lint` + `typecheck` + `test` + `next build` verdes; voz degrada sem chaves.
+- [ ] Modo mãos-livres: ao ligar o toggle, falar→pausar dispara o turno sozinho, o Nexus responde por
+      voz (MiniMax) e volta a escutar; a escuta pausa enquanto o Nexus fala (sem eco). VAD coberto por testes.
