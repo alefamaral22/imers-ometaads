@@ -18,9 +18,14 @@ const NAV = [
   { href: '/settings', label: 'Conexões & chaves' },
 ] as const;
 
+// Onda 14 — "Contas" só para papéis de visibilidade global (a agência e seus sócios).
+const ACCOUNTS_NAV = { href: '/accounts', label: 'Contas' } as const;
+
 /** Authenticated dashboard chrome: top nav + content container. Server component. */
 export async function Shell({ children }: { children: ReactNode }) {
   const session = await readSession();
+  const canSeeAccounts = session?.role === 'super_admin' || session?.role === 'socio';
+  const nav = canSeeAccounts ? [...NAV, ACCOUNTS_NAV] : NAV;
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <nav className="border-b border-neutral-800 bg-neutral-900/60">
@@ -30,7 +35,7 @@ export async function Shell({ children }: { children: ReactNode }) {
               Acme · Nexus
             </Link>
             <div className="flex gap-4">
-              {NAV.map((item) => (
+              {nav.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

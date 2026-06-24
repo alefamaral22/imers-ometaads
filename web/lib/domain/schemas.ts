@@ -37,10 +37,16 @@ export const accountRowSchema = z.object({
   plan: z.string(),
   subscription_status: z.string(),
   is_active: z.boolean(),
+  email: z.string().nullable(), // identificador de login (não-segredo); null até ter senha própria
+  last_login_at: ts.nullable(),
   created_at: ts,
   updated_at: ts,
 });
 export type AccountRow = z.infer<typeof accountRowSchema>;
+
+// Projeção de DISPLAY das accounts: NUNCA inclui password_hash → o hash nunca sai do servidor.
+export const ACCOUNT_DISPLAY_COLUMNS =
+  'id,slug,name,role,plan,subscription_status,is_active,email,last_login_at,created_at,updated_at';
 
 // public.ad_account_connections — projeção de DISPLAY: NUNCA inclui access_token_cipher.
 export const connectionStatus = z.enum(['unverified', 'active', 'invalid', 'revoked']);

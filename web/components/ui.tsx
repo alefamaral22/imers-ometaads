@@ -45,6 +45,8 @@ const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-neutral-500/15 text-neutral-300 ring-neutral-500/30',
   building: 'bg-sky-500/15 text-sky-300 ring-sky-500/30',
   failed: 'bg-red-500/15 text-red-300 ring-red-500/30',
+  ativa: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/30',
+  inativa: 'bg-red-500/15 text-red-300 ring-red-500/30',
 };
 
 export function Badge({ value }: { value: string }) {

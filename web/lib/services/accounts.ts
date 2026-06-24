@@ -1,16 +1,28 @@
 import 'server-only';
-import { selectRows, patchRows } from '../db/client';
-import { accountRowSchema, parseRows, type AccountRow } from '../domain/schemas';
+import { selectRows, patchRows, insertRows } from '../db/client';
+import {
+  accountRowSchema,
+  parseRows,
+  ACCOUNT_DISPLAY_COLUMNS,
+  type AccountRow,
+} from '../domain/schemas';
 import { readSession } from '../auth/server';
 import { scopeFromClaims, type AccountScope } from '../multitenant/scope';
+import { hashPassword } from '../auth/password';
+import { buildAccountInsertRow, type ProvisionableRole } from '../multitenant/accounts-admin';
+import { writeOperationLog } from './logs';
 import type { AccountRole } from '../auth/domain';
 
 /**
- * Server-side reads of public.accounts (RLS closed to the browser, ADR 0002/0026). The account list
- * never carries a secret; the login query (below) reads password_hash but it stays server-side.
+ * Server-side reads of public.accounts (RLS closed to the browser, ADR 0002/0026). Reads project the
+ * DISPLAY columns (never password_hash → o hash nunca sai do servidor). A query de login (abaixo) lê o
+ * password_hash, mas ele fica server-side e nunca volta na resposta.
  */
 export async function listAccounts(): Promise<AccountRow[]> {
-  const rows = await selectRows('accounts', { order: 'created_at.asc' });
+  const rows = await selectRows('accounts', {
+    select: ACCOUNT_DISPLAY_COLUMNS,
+    order: 'created_at.asc',
+  });
   return parseRows(accountRowSchema, rows);
 }
 
@@ -61,4 +73,66 @@ export async function getSuperAdminAnchor(): Promise<{
 /** Marca o último login (best-effort; não bloqueia o fluxo se falhar). */
 export async function touchLastLogin(accountId: string): Promise<void> {
   await patchRows('accounts', { id: accountId }, { last_login_at: new Date().toISOString() });
+}
+
+// ── Onda 14 — provisionamento pelo super_admin (mutações atrás de requireRole(['super_admin'])) ──
+
+export interface AdminCreateAccountInput {
+  slug: string;
+  name: string;
+  role: ProvisionableRole;
+  plan: string;
+  email: string;
+  password: string;
+}
+
+/** Cria uma account com hash scrypt. A resposta (parse por accountRowSchema) NÃO tem password_hash. */
+export async function createAccount(
+  actorSlug: string,
+  input: AdminCreateAccountInput,
+): Promise<AccountRow> {
+  const row = buildAccountInsertRow(
+    { slug: input.slug, name: input.name, role: input.role, plan: input.plan, email: input.email },
+    hashPassword(input.password),
+  );
+  const inserted = await insertRows('accounts', [row]);
+  const account = parseRows(accountRowSchema, inserted)[0];
+  if (!account) throw new Error('insert accounts returned no row');
+  await writeOperationLog({
+    entityType: 'account',
+    entityId: account.id,
+    action: 'create',
+    actor: actorSlug,
+    summary: `account ${account.slug} criada (${account.role}/${account.plan})`,
+  }).catch(() => {});
+  return account;
+}
+
+/** Lê id+role+slug de uma account (para a guarda canToggleAccount antes de mutar). */
+export async function getAccountById(
+  id: string,
+): Promise<{ id: string; role: AccountRole; slug: string } | null> {
+  const rows = await selectRows('accounts', { select: 'id,role,slug', eq: { id }, limit: 1 });
+  const row = rows[0] as { id?: string; role?: AccountRole; slug?: string } | undefined;
+  if (!row?.id || !row.role || !row.slug) return null;
+  return { id: row.id, role: row.role, slug: row.slug };
+}
+
+/** Ativa/desativa uma account (soft). Desativar corta o login imediatamente. Audita a ação. */
+export async function setAccountActive(
+  actorSlug: string,
+  accountId: string,
+  isActive: boolean,
+): Promise<AccountRow> {
+  const updated = await patchRows('accounts', { id: accountId }, { is_active: isActive });
+  const account = parseRows(accountRowSchema, updated)[0];
+  if (!account) throw new Error('patch accounts returned no row');
+  await writeOperationLog({
+    entityType: 'account',
+    entityId: account.id,
+    action: isActive ? 'activate' : 'pause',
+    actor: actorSlug,
+    summary: `account ${account.slug} ${isActive ? 'reativada' : 'desativada'}`,
+  }).catch(() => {});
+  return account;
 }

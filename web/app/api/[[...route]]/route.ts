@@ -6,6 +6,7 @@ import {
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
   isAuthenticated,
+  hasRole,
   buildClaims,
   loginInputSchema,
   passwordMatches,
@@ -40,11 +41,20 @@ import {
   getLoginAccountByEmail,
   getSuperAdminAnchor,
   touchLastLogin,
+  createAccount,
+  getAccountById,
+  setAccountActive,
 } from '../../../lib/services/accounts';
 import { listConnections, createConnection } from '../../../lib/services/connections';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
-import { createConnectionSchema, upsertApiKeySchema } from '../../../lib/multitenant/requests';
+import {
+  createConnectionSchema,
+  upsertApiKeySchema,
+  createAccountSchema,
+  setAccountActiveSchema,
+} from '../../../lib/multitenant/requests';
 import { scopeFromClaims } from '../../../lib/multitenant/scope';
+import { canToggleAccount } from '../../../lib/multitenant/accounts-admin';
 
 export const runtime = 'nodejs';
 
@@ -166,7 +176,53 @@ app.get('/data/logs', async (c) => c.json({ logs: await listOperationLogs() }));
 // ── Onda 12 — multi-tenant: accounts, conexões Meta e chaves de API ────────────
 // Leituras projetam só colunas de DISPLAY (o cipher do token/chave NUNCA é selecionado). Escritas
 // cifram server-side. Escopo por account (super_admin vê tudo). O segredo nunca volta na resposta.
-app.get('/data/accounts', async (c) => c.json({ accounts: await listAccounts() }));
+// Listar accounts: só visibilidade global (super_admin/socio); cliente_usuario não enxerga tenants.
+app.get('/data/accounts', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
+  return c.json({ accounts: await listAccounts() });
+});
+
+// Criar account (provisionamento) — só super_admin. UI nunca cria super_admin (schema barra o role).
+app.post('/data/accounts', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createAccountSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const account = await createAccount(claims.slug, parsed.data);
+    return c.json({ account }, 201);
+  } catch (err) {
+    // slug/email duplicado (unique/citext) → 409 genérico (não diz qual dos dois colidiu).
+    if (err instanceof Error && /\b409\b|23505/.test(err.message)) {
+      return c.json({ error: 'conflict' }, 409);
+    }
+    throw err;
+  }
+});
+
+// Ativar/desativar account (soft) — só super_admin; nunca a si mesmo nem outro super_admin.
+app.patch('/data/accounts/:id', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = setAccountActiveSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const target = await getAccountById(id);
+  if (!target) return c.json({ error: 'not_found' }, 404);
+  const decision = canToggleAccount(claims.sub, target);
+  if (!decision.ok) return c.json({ error: 'forbidden', reason: decision.reason }, 403);
+  const account = await setAccountActive(claims.slug, id, parsed.data.isActive);
+  return c.json({ account });
+});
 
 app.get('/data/connections', async (c) => {
   const claims = await apiClaims(c);
@@ -319,3 +375,4 @@ app.get('/health', (c) => c.json({ ok: true }));
 
 export const GET = handle(app);
 export const POST = handle(app);
+export const PATCH = handle(app);

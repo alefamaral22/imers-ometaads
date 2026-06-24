@@ -1,5 +1,5 @@
 import 'server-only';
-import { selectRows } from '../db/client';
+import { selectRows, insertRows } from '../db/client';
 import {
   dailySummaryRowSchema,
   operationLogRowSchema,
@@ -7,6 +7,29 @@ import {
   type DailySummaryRow,
   type OperationLogRow,
 } from '../domain/schemas';
+
+export interface OperationLogInput {
+  entityType: string;
+  action: 'create' | 'update' | 'delete' | 'activate' | 'pause';
+  entityId?: string | null;
+  actor?: string | null;
+  summary?: string | null;
+  clientId?: string | null;
+}
+
+/** Append em operation_logs (trilha de auditoria). Best-effort: o caller decide se ignora a falha. */
+export async function writeOperationLog(input: OperationLogInput): Promise<void> {
+  await insertRows('operation_logs', [
+    {
+      client_id: input.clientId ?? null,
+      entity_type: input.entityType,
+      entity_id: input.entityId ?? null,
+      action: input.action,
+      actor: input.actor ?? null,
+      summary: input.summary ?? null,
+    },
+  ]);
+}
 
 export async function listOperationLogs(limit = 100): Promise<OperationLogRow[]> {
   const rows = await selectRows('operation_logs', { order: 'created_at.desc', limit });

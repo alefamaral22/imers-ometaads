@@ -541,6 +541,27 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   ter login por email real: rodar `set-account-password.ts acme <email> <senha>`.
 - ⚠️ **Não exercitado ao vivo** (sem deploy ainda); lógica de auth/scope 100% testada.
 
+### Onda 14 — Provisionamento de accounts pelo super_admin ✅ (commit nesta sessão)
+- **Spec/ADR/threat model:** `docs/specs/SPEC-provisionamento-accounts.md` (Approved-design), ADR
+  `0030-provisionamento-accounts-super-admin`, threat model `docs/security/threats/provisionamento-accounts.md`.
+- **Sem migration** — `accounts` (Ondas 12+13) já tinha tudo (`slug,name,role,plan,is_active,email,password_hash,last_login_at`).
+- **Domínio puro (testado):** `web/lib/multitenant/accounts-admin.ts` — `PROVISIONABLE_ROLES`
+  (=`{socio,cliente_usuario}`, **nunca** super_admin pela UI), `buildAccountInsertRow` (puro; recebe o
+  hash pronto), `canToggleAccount` (proíbe desativar a si mesmo ou um super_admin). +6 testes; +4 nos
+  schemas (`createAccountSchema`/`setAccountActiveSchema` em `requests.ts`). **299 testes** no total.
+- **Serviços** (`services/accounts.ts`): `createAccount` (hash scrypt, audita, resposta **sem**
+  password_hash), `getAccountById`, `setAccountActive` (soft, corta login na hora). `listAccounts` agora
+  projeta `ACCOUNT_DISPLAY_COLUMNS` (sem password_hash). Writer de auditoria `writeOperationLog` em
+  `services/logs.ts` (`entity_type='account'`, action create|activate|pause).
+- **API Hono:** `POST /data/accounts` (super_admin; 409 em slug/email duplicado), `PATCH /data/accounts/:id`
+  (toggle `is_active`; 403 self/super_admin via `canToggleAccount`; 404 inexistente), `GET /data/accounts`
+  **restrito** a super_admin/socio (antes vazava a lista a qualquer sessão). Export `PATCH` adicionado.
+- **UI:** página `/accounts` (`requireRole(['super_admin','socio'])`; socio read-only), `AccountForm` +
+  `AccountToggle` (client), link "Contas" no nav só p/ visibilidade global. Badge `ativa`/`inativa`.
+- Gates: lint/typecheck(root+web)/test(299)/format + `cd web && next build` **verdes** (rota `/accounts`).
+- ⚠️ **Não exercitado ao vivo** (sem deploy). Fora de escopo (fase seguinte): `account_members`
+  (multiusuário), billing real, "agir como"/switcher, signup público.
+
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
   builder remoto batia em TLS x509 na rede do operador), `.dockerignore` p/ não copiar `node_modules`

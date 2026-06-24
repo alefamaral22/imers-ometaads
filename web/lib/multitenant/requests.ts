@@ -23,3 +23,26 @@ export const upsertApiKeySchema = z.object({
   label: z.string().trim().max(120).optional(),
 });
 export type UpsertApiKeyRequest = z.infer<typeof upsertApiKeySchema>;
+
+/**
+ * Onda 14 — provisionamento de accounts pelo super_admin. `role` aceita SÓ socio/cliente_usuario
+ * (anti-escalada: a UI nunca cria super_admin). A senha só transita aqui para virar hash scrypt.
+ */
+export const createAccountSchema = z.object({
+  slug: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/,
+      'slug inválido (a–z, 0–9 e hífen; 2–40 chars)',
+    ),
+  name: z.string().trim().min(2).max(120),
+  role: z.enum(['socio', 'cliente_usuario']),
+  plan: z.enum(['trial', 'starter', 'pro', 'agency']).default('trial'),
+  email: z.string().email().max(256),
+  password: z.string().min(8).max(256),
+});
+export type CreateAccountRequest = z.infer<typeof createAccountSchema>;
+
+export const setAccountActiveSchema = z.object({ isActive: z.boolean() });
+export type SetAccountActiveRequest = z.infer<typeof setAccountActiveSchema>;
