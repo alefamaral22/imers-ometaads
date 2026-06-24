@@ -408,6 +408,12 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   de um `blob:` URL → cairia no `default-src 'self'`). Fix: `microphone=(self)` + `media-src` com `blob:`
   (câmera/geo seguem desabilitadas). Widget passou a mostrar mensagem amigável se o mic for negado.
   **Precisa redeploy na Vercel** para o header novo valer.
+- **Visibilidade do Nexus (contas/campanhas):** o assistente do dashboard lê o **espelho no banco**, não
+  a Meta ao vivo (dashboard não tem token Meta — só o runner, via MCP). `get_clients` já trazia as contas
+  (`ad_account_id`); faltava expor campanhas → adicionada a read tool **`get_campaigns`** (status,
+  orçamento, objetivo, `meta_campaign_id`; filtro opcional por client_slug) + prompt orientado a
+  consultá-las. **Limite por design:** o Nexus só "vê" o que as skills criaram/persistiram no banco; para
+  enxergar campanhas que existem só na Meta seria preciso uma skill de **sync** no runner (não construída).
 - ⚠️ **Ação de config pendente (fora do código):** setar na **Vercel** as envs `CLAUDE_API_KEY`,
   `OPENAI_API_KEY`, `TTS_PROVIDER=minimax`, `MINIMAX_API_KEY`, `MINIMAX_VOICE_ID` (ex.:
   `Portuguese_Solemn_Narrator_v1`) e **redeployar** — sem isso a voz degrada para texto em produção.

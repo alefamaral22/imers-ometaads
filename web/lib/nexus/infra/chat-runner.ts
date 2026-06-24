@@ -13,6 +13,7 @@ import {
 } from './anthropic';
 import { enqueueJob } from './agent-jobs';
 import { getClientBySlug, listClients } from '../../services/clients';
+import { listAllCampaigns, listCampaignsByClient } from '../../services/campaigns';
 import {
   getLatestAnalysis,
   listAnalyses,
@@ -50,6 +51,13 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
   const clientSlug = typeof input.client_slug === 'string' ? input.client_slug : undefined;
   if (name === 'get_clients') {
     return JSON.stringify(await listClients());
+  }
+  if (name === 'get_campaigns') {
+    if (clientSlug) {
+      const client = await getClientBySlug(clientSlug);
+      return JSON.stringify(client ? await listCampaignsByClient(client.id) : []);
+    }
+    return JSON.stringify(await listAllCampaigns());
   }
   if (name === 'get_analyses') {
     if (clientSlug) {

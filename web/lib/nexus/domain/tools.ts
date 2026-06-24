@@ -23,8 +23,20 @@ export interface NexusToolDef {
 export const READ_TOOLS: NexusToolDef[] = [
   {
     name: 'get_clients',
-    description: 'Lista os clientes cadastrados (slug, nome, teto de orçamento).',
+    description:
+      'Lista os clientes cadastrados e suas CONTAS DE ANÚNCIO da Meta (slug, nome, ad_account_id, ' +
+      'moeda, teto de orçamento diário). Use para saber quais contas a agência opera.',
     input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_campaigns',
+    description:
+      'Lista as campanhas registradas no banco da agência (nome, objetivo, status PAUSED/ACTIVE, ' +
+      'orçamento diário em centavos, meta_campaign_id). Opcional: client_slug para filtrar por cliente.',
+    input_schema: {
+      type: 'object',
+      properties: { client_slug: { type: 'string', description: 'slug do cliente (opcional)' } },
+    },
   },
   {
     name: 'get_analyses',

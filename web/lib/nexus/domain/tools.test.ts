@@ -6,6 +6,7 @@ import { appendTurn, createMemory, recentTurns } from './memory';
 describe('tool registry', () => {
   it('classifies read vs write tools, unknown → null', () => {
     expect(classifyTool('get_clients')).toBe('read');
+    expect(classifyTool('get_campaigns')).toBe('read');
     expect(classifyTool('enqueue_job')).toBe('write');
     expect(classifyTool('delete_everything')).toBeNull();
   });
