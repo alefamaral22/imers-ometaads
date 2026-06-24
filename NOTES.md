@@ -474,9 +474,13 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - **Docs estruturais ✅:** ADR 0026 (multi-tenancy/isolamento), 0027 (segredos cifrados +
   `resolveProviderKey`), 0028 (Meta por token manual; OAuth = fase 2) + threat model STRIDE
   `docs/security/threats/saas-multitenant.md`.
-- ⚠️ **Pendente (código, não feito):** helpers cripto AES-256-GCM + `resolveProviderKey` (lógica pura
-  testável), skill `validate-connections-tick`, ajuste runner (`run-skill.sh` injeta chaves do tenant),
-  serviços/telas do dashboard + acessador `withAccount`. Spec §9 tem o plano. Nada commitado ainda.
+- **Núcleo puro ✅ (commit nesta sessão):** `scripts/onda12/domain/` — `crypto.ts` (AES-256-GCM:
+  `parseKey`/`encryptSecret`/`decryptSecret` fail-closed/`last4`/bytea `\x` boundary) e `provider-key.ts`
+  (`resolveProviderKey`: tenant nunca cai na global; fora do super_admin chave própria obrigatória).
+  **19 testes** (248 no total). Gates verdes: lint/typecheck/test/format.
+- ⚠️ **Pendente (código, não feito):** infra REST p/ ler conexões/chaves + decifrar; skill
+  `validate-connections-tick`; ajuste runner (`run-skill.sh` injeta `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`
+  do tenant); serviços/telas do dashboard + acessador `withAccount`. Spec §9 tem o plano.
 
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
