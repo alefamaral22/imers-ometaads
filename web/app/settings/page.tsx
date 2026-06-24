@@ -6,6 +6,8 @@ import { listApiKeys } from '../../lib/services/api-keys';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { formatDate } from '../../lib/domain/format';
+import { ConnectionForm } from '../../components/settings/connection-form';
+import { ApiKeyForm } from '../../components/settings/api-key-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +25,12 @@ export default async function SettingsPage() {
   let connections: Awaited<ReturnType<typeof listConnections>> = [];
   let apiKeys: Awaited<ReturnType<typeof listApiKeys>> = [];
   let accountName = new Map<string, string>();
+  let accountList: { id: string; name: string }[] = [];
   try {
     const scope = await getCurrentScope();
     const accounts = await listAccounts();
     accountName = new Map(accounts.map((a) => [a.id, a.name]));
+    accountList = accounts.map((a) => ({ id: a.id, name: a.name }));
     [connections, apiKeys] = await Promise.all([listConnections(scope), listApiKeys(scope)]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
@@ -48,6 +52,9 @@ export default async function SettingsPage() {
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-neutral-300">Conexões Meta</h2>
+      {accountList.length > 0 ? (
+        <ConnectionForm accounts={accountList} disabled={!vaultOn} />
+      ) : null}
       {!error && connections.length === 0 ? (
         <EmptyState>Nenhuma conexão Meta conectada ainda.</EmptyState>
       ) : null}
@@ -81,6 +88,7 @@ export default async function SettingsPage() {
       ) : null}
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-neutral-300">Chaves de API</h2>
+      {accountList.length > 0 ? <ApiKeyForm accounts={accountList} disabled={!vaultOn} /> : null}
       {!error && apiKeys.length === 0 ? (
         <EmptyState>Nenhuma chave de API cadastrada ainda.</EmptyState>
       ) : null}

@@ -507,10 +507,15 @@ operação real; 6 precede 7; 8 precede 9 e 10.
     + flag `isSecretsVaultEnabled` em `web/lib/env.ts`.
   - Gates: lint/typecheck/test (277)/format + `cd web && npm run build` **verdes** (rota `/settings`).
   - ⚠️ **Não exercitado ao vivo** (sem `*_ENC_KEY` setadas na Vercel; leitura funciona, escrita dá 503).
-    **Forms de cadastro** ficam para um próximo passo (criação hoje via API/Nexus). `.env.example` ainda
-    não espelha as 2 chaves (arquivo bloqueado por permissão nesta sessão).
-- **Onda 12 — schema/segurança/runner/dashboard prontos.** Falta só: evolução do modelo de **auth**
-  para login por account (hoje operador único = super_admin) + forms de cadastro + go-live das envs.
+- **Forms de cadastro ✅ (commit nesta sessão):** `web/components/settings/{connection-form,api-key-form}.tsx`
+  (client) ligados no `/settings`. POST para `/api/data/{connections,api-keys}` → cifram server-side,
+  `router.refresh()`. Desabilitam quando o cofre está off (`!isSecretsVaultEnabled`); mensagens de
+  erro mapeadas (inclui `vault_unconfigured`). `web build` verde (rota `/settings` 1.87 kB).
+- **Onda 12 — schema/segurança/runner/dashboard/forms prontos.** Pendências restantes (fora do escopo
+  desta onda): (1) evolução do **auth** para login por account (hoje operador único = super_admin; a
+  spec já separou como fase própria); (2) **go-live das envs** `AD_TOKEN_ENC_KEY`/`API_KEY_ENC_KEY`
+  (`fly secrets` + Vercel) para a escrita sair do 503; (3) `.env.example` espelhar as 2 chaves (arquivo
+  bloqueado por permissão nesta sessão — está em `types/env.d.ts` e `web/lib/env.ts`).
 
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
