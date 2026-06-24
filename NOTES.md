@@ -402,6 +402,12 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   "Mãos-livres" + indicador de estado (Ouvindo/Processando/Falando); push-to-talk fica oculto no modo ON.
 - Gates verdes: lint, typecheck (raiz + web), **229 testes**, `cd web && npm run build`. Docs: SPEC-016
   (entregáveis+aceite) e ADR 0011 atualizados.
+- **Gotcha de header (corrigido):** em produção o mic não abria e a voz não tocava por causa dos headers
+  de segurança em `web/lib/security/headers.ts`: `Permissions-Policy: microphone=()` **bloqueava o mic
+  em toda origem** (clique não fazia nada) e faltava `media-src 'self' blob:` no CSP (o áudio do TTS toca
+  de um `blob:` URL → cairia no `default-src 'self'`). Fix: `microphone=(self)` + `media-src` com `blob:`
+  (câmera/geo seguem desabilitadas). Widget passou a mostrar mensagem amigável se o mic for negado.
+  **Precisa redeploy na Vercel** para o header novo valer.
 - ⚠️ **Ação de config pendente (fora do código):** setar na **Vercel** as envs `CLAUDE_API_KEY`,
   `OPENAI_API_KEY`, `TTS_PROVIDER=minimax`, `MINIMAX_API_KEY`, `MINIMAX_VOICE_ID` (ex.:
   `Portuguese_Solemn_Narrator_v1`) e **redeployar** — sem isso a voz degrada para texto em produção.

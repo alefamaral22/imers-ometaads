@@ -9,6 +9,8 @@ describe('buildContentSecurityPolicy', () => {
     expect(csp).not.toContain("'unsafe-eval'");
     expect(csp).toContain("connect-src 'self'");
     expect(csp).not.toContain('ws:');
+    // media-src libera blob: para a reprodução do áudio do TTS (voz do Nexus).
+    expect(csp).toMatch(/media-src[^;]*\bblob:/);
   });
 
   it('dev: relaxa script-src (eval/inline) e connect-src (ws) p/ o HMR do Next', () => {
@@ -28,5 +30,7 @@ describe('buildSecurityHeaders', () => {
     expect(h['X-Content-Type-Options']).toBe('nosniff');
     expect(h['x-nonce']).toBe('n0nce');
     expect(h['Content-Security-Policy']).toContain("'unsafe-eval'");
+    // O mic é liberado para a própria origem (Nexus voz); câmera/geo seguem desabilitadas.
+    expect(h['Permissions-Policy']).toBe('camera=(), microphone=(self), geolocation=()');
   });
 });

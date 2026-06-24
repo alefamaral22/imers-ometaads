@@ -29,6 +29,9 @@ export function buildContentSecurityPolicy(nonce: string, dev = false): string {
     'script-src': scriptSrc,
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'data:', 'blob:'],
+    // O TTS do Nexus toca o áudio (audio/mpeg) a partir de um blob: URL — sem isto cairia no
+    // default-src 'self' e o navegador bloquearia a reprodução da voz.
+    'media-src': ["'self'", 'blob:'],
     'font-src': ["'self'"],
     'connect-src': connectSrc,
     'frame-src': ['https://challenges.cloudflare.com'],
@@ -57,7 +60,9 @@ export function buildSecurityHeaders(nonce: string, dev = false): SecurityHeader
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    // microphone=(self): o Nexus precisa do mic (push-to-talk e mãos-livres) na própria origem.
+    // câmera e geolocalização seguem desabilitadas (não usadas).
+    'Permissions-Policy': 'camera=(), microphone=(self), geolocation=()',
     // Propagated to Server Components so they can read the nonce when emitting inline scripts.
     'x-nonce': nonce,
   };

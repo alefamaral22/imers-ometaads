@@ -108,9 +108,19 @@ export function NexusWidget() {
   const stableOnUtterance = useCallback((blob: Blob) => handleUtteranceRef.current(blob), []);
 
   const toggleHandsFree = useCallback(async () => {
-    if (voice.handsFree) voice.stopHandsFree();
-    else await voice.startHandsFree(stableOnUtterance);
-  }, [voice, stableOnUtterance]);
+    if (voice.handsFree) {
+      voice.stopHandsFree();
+      return;
+    }
+    try {
+      await voice.startHandsFree(stableOnUtterance);
+    } catch {
+      push({
+        role: 'assistant',
+        text: 'Não consegui acessar o microfone — verifique a permissão do navegador para este site.',
+      });
+    }
+  }, [voice, stableOnUtterance, push]);
 
   const confirm = useCallback(async () => {
     if (!pending || loading) return;
@@ -142,9 +152,16 @@ export function NexusWidget() {
       const text = await voice.stopAndTranscribe();
       if (text) await send(text);
     } else {
-      await voice.startRecording();
+      try {
+        await voice.startRecording();
+      } catch {
+        push({
+          role: 'assistant',
+          text: 'Não consegui acessar o microfone — verifique a permissão do navegador para este site.',
+        });
+      }
     }
-  }, [voice, send]);
+  }, [voice, send, push]);
 
   // Texto de estado do modo mãos-livres.
   const hfStatus = voice.speaking
