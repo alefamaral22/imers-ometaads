@@ -30,5 +30,11 @@ export function buildSystemPrompt(): string {
     '- Analisar campanha = enqueue_job com slug "analyze". Se o cliente não foi dito, primeiro chame',
     '  get_clients para resolvê-lo (se houver só um, use-o direto) e então PROPONHA a análise.',
     '- Para mostrar resultados de uma análise JÁ feita, use get_analyses/get_funnel (leitura direta).',
+    '',
+    'EVITAR DUPLICAÇÃO (criar campanha):',
+    '- ANTES de propor "create-traffic" ou "create-sales", chame get_campaigns (filtrando pelo cliente)',
+    '  para ver se já existe uma campanha do mesmo objetivo. Criar gera SEMPRE uma campanha nova na Meta.',
+    '- Se já existir campanha equivalente, NÃO proponha criar por padrão: avise o operador do que já',
+    '  existe (nome/status) e só proponha uma nova se ele confirmar explicitamente que quer outra.',
   ].join('\n');
 }
