@@ -7,7 +7,7 @@
 
 import { listJobSlugs } from './allowlist';
 
-export type ToolClass = 'read' | 'write';
+export type ToolClass = 'read' | 'write' | 'snapshot';
 
 export interface NexusToolDef {
   name: string;
@@ -75,13 +75,53 @@ export const WRITE_TOOLS: NexusToolDef[] = [
   },
 ];
 
-export const ALL_TOOLS: NexusToolDef[] = [...READ_TOOLS, ...WRITE_TOOLS];
+// Tools de snapshot ao vivo (Onda 16) — leitura Meta AO VIVO via job read-only. request_* enfileira
+// um job (sem confirmação: não muta nada e não gasta); get_* lê o resultado já pronto do banco.
+export const SNAPSHOT_TOOLS: NexusToolDef[] = [
+  {
+    name: 'request_live_snapshot',
+    description:
+      'Pede um raio-x AO VIVO das campanhas (métricas atuais + alertas) direto da Meta. Dispara uma ' +
+      'leitura read-only — NÃO muda nada e NÃO gasta, então não precisa de confirmação. Use quando o ' +
+      'operador perguntar o estado AGORA ("como estão minhas campanhas?", "tem algum alerta?"). ' +
+      'Retorna um job_id; o resultado fica pronto em instantes (leia depois com get_live_snapshot).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        client_slug: { type: 'string', description: 'slug do cliente (opcional se houver só um)' },
+        period: { type: 'string', description: 'janela: last_7d (padrão), last_14d, last_30d' },
+      },
+    },
+  },
+  {
+    name: 'get_live_snapshot',
+    description:
+      'Lê o raio-x ao vivo já PRONTO (métricas por campanha + alertas) do banco. Use para narrar os ' +
+      'números depois que o snapshot ficou disponível. Se ainda não estiver pronto, retorna status pending.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        client_slug: { type: 'string', description: 'slug do cliente (opcional)' },
+        job_id: {
+          type: 'string',
+          description: 'job_id do snapshot (opcional; senão pega o mais recente)',
+        },
+      },
+    },
+  },
+];
+
+export const ALL_TOOLS: NexusToolDef[] = [...READ_TOOLS, ...WRITE_TOOLS, ...SNAPSHOT_TOOLS];
 
 const READ_NAMES = new Set(READ_TOOLS.map((t) => t.name));
 const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
+// get_live_snapshot é leitura do banco (classe 'read'); só request_live_snapshot enfileira ('snapshot').
+const SNAPSHOT_NAMES = new Set(['request_live_snapshot']);
 
 export function classifyTool(name: string): ToolClass | null {
+  if (name === 'get_live_snapshot') return 'read'; // lê o snapshot pronto no banco
   if (READ_NAMES.has(name)) return 'read';
   if (WRITE_NAMES.has(name)) return 'write';
+  if (SNAPSHOT_NAMES.has(name)) return 'snapshot';
   return null; // tool desconhecida → ignorada (deny-by-default)
 }

@@ -129,6 +129,20 @@ export const analysisRowSchema = z.object({
 });
 export type AnalysisRow = z.infer<typeof analysisRowSchema>;
 
+// public.live_snapshots (Onda 16) — raio-x ao vivo (1 linha por job). payload é jsonb produzido pela
+// skill (métricas compactas + alertas); validado de forma frouxa aqui (dado de fronteira, consumido
+// como JSON pelo Nexus). Sem PII por contrato.
+export const liveSnapshotRowSchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid(),
+  client_id: z.string().uuid(),
+  job_id: z.string().uuid(),
+  period: z.string(),
+  payload: z.unknown(),
+  created_at: ts,
+});
+export type LiveSnapshotRow = z.infer<typeof liveSnapshotRowSchema>;
+
 // public.funnel_events
 export const funnelLevel = z.enum(['account', 'campaign', 'ad_set', 'ad']);
 export const funnelEventType = z.enum([

@@ -29,6 +29,7 @@ describe('resolveJobSlug', () => {
       'landing',
       'landing_publish',
       'landing_edit',
+      'snapshot',
     ]);
     for (const slug of listJobSlugs()) {
       expect(valid.has(JOB_SLUGS[slug].kind)).toBe(true);

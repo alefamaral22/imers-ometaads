@@ -16,6 +16,7 @@ export const ALLOWED_ARG_KEYS = [
   'campaign_id',
   'landing_page_id',
   'subdomain',
+  'period', // janela do snapshot ao vivo (ex.: last_7d, last_30d) — Onda 16
 ] as const;
 
 export type AllowedArgKey = (typeof ALLOWED_ARG_KEYS)[number];

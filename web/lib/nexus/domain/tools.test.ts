@@ -1,20 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, classifyTool, READ_TOOLS, WRITE_TOOLS } from './tools';
+import { ALL_TOOLS, classifyTool, READ_TOOLS, WRITE_TOOLS, SNAPSHOT_TOOLS } from './tools';
 import { buildSystemPrompt } from './prompt';
 import { appendTurn, createMemory, recentTurns } from './memory';
 
 describe('tool registry', () => {
-  it('classifies read vs write tools, unknown → null', () => {
+  it('classifies read vs write vs snapshot tools, unknown → null', () => {
     expect(classifyTool('get_clients')).toBe('read');
     expect(classifyTool('get_campaigns')).toBe('read');
     expect(classifyTool('enqueue_job')).toBe('write');
+    // request_* enfileira (snapshot); get_* lê o resultado pronto (read).
+    expect(classifyTool('request_live_snapshot')).toBe('snapshot');
+    expect(classifyTool('get_live_snapshot')).toBe('read');
     expect(classifyTool('delete_everything')).toBeNull();
   });
 
   it('read tools never carry write capability and all have object schemas', () => {
     expect(READ_TOOLS.every((t) => t.input_schema.type === 'object')).toBe(true);
     expect(WRITE_TOOLS.map((t) => t.name)).toEqual(['enqueue_job']);
-    expect(ALL_TOOLS).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length);
+    expect(ALL_TOOLS).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + SNAPSHOT_TOOLS.length);
   });
 });
 

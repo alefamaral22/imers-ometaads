@@ -13,7 +13,8 @@ export type JobKind =
   | 'summarize'
   | 'landing'
   | 'landing_publish'
-  | 'landing_edit';
+  | 'landing_edit'
+  | 'snapshot';
 
 export interface ResolvedSkill {
   slug: JobSlug;
@@ -31,6 +32,8 @@ export const JOB_SLUGS = {
   summarize: { skill: 'daily-summary-cliente-exemplo', kind: 'summarize' },
   'create-landing': { skill: 'create-landing-page-cliente-exemplo', kind: 'landing' },
   'publish-landing': { skill: 'publish-landing-page-cliente-exemplo', kind: 'landing_publish' },
+  // Read-only: raio-x ao vivo das campanhas (métricas + alertas). Não muta a Meta, não gasta.
+  'live-snapshot': { skill: 'live-snapshot-cliente-exemplo', kind: 'snapshot' },
 } as const satisfies Record<string, { skill: string; kind: JobKind }>;
 
 export type JobSlug = keyof typeof JOB_SLUGS;

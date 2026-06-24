@@ -25,6 +25,8 @@ const HUMAN: Record<JobKind, string> = {
   landing: 'criar uma landing page (rascunho)',
   landing_publish: 'publicar uma landing page',
   landing_edit: 'editar uma landing page',
+  // read-only (perna leve do híbrido): não passa por confirmação, mas o kind precisa de rótulo.
+  snapshot: 'puxar um raio-x ao vivo das campanhas',
 };
 
 /**

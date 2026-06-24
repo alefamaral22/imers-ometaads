@@ -17,11 +17,26 @@ interface PendingAction {
   args: Record<string, string>;
 }
 
+interface SnapshotTrigger {
+  status: string;
+  jobId: string | null;
+}
+
 interface ChatResponse {
   reply: string;
   pending?: PendingAction;
   job?: { status: string; jobId: string | null };
+  snapshot?: SnapshotTrigger;
 }
+
+interface HistoryTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+// Polling do raio-x ao vivo (Onda 16): o job read-only termina em segundos; checamos com folga.
+const SNAPSHOT_POLL_INTERVAL_MS = 1500;
+const SNAPSHOT_POLL_MAX_ATTEMPTS = 14; // ~21s de janela antes de degradar com aviso amigável.
 
 /**
  * Widget do Nexus (client). Chat por texto e voz. Dois modos de voz:
@@ -43,6 +58,56 @@ export function NexusWidget() {
 
   const push = useCallback((m: ChatMsg) => setMessages((prev) => [...prev, m]), []);
 
+  // Chamada crua ao chat (sem efeitos de UI). Usada pelo turno normal e pela narração do raio-x.
+  const postChat = useCallback(
+    async (message: string, history: HistoryTurn[]): Promise<ChatResponse | null> => {
+      try {
+        const res = await fetch('/api/nexus/chat', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ message, history }),
+        });
+        if (!res.ok) return null;
+        return (await res.json()) as ChatResponse;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  // Raio-x ao vivo: faz polling até o snapshot ficar pronto e então pede ao Nexus que narre (turno de
+  // follow-up). Degrada com um aviso falado se demorar. A narração já sai assertiva (regras do prompt).
+  const pollAndNarrate = useCallback(
+    async (jobId: string | null, history: HistoryTurn[]): Promise<void> => {
+      for (let attempt = 0; attempt < SNAPSHOT_POLL_MAX_ATTEMPTS; attempt++) {
+        await new Promise((r) => setTimeout(r, SNAPSHOT_POLL_INTERVAL_MS));
+        let ready = false;
+        try {
+          const q = jobId ? `?jobId=${encodeURIComponent(jobId)}` : '';
+          const res = await fetch(`/api/nexus/snapshot${q}`);
+          if (res.ok) ready = ((await res.json()) as { status?: string }).status === 'ready';
+        } catch {
+          /* tenta de novo no próximo tick */
+        }
+        if (ready) {
+          const data = await postChat(
+            'O raio-x ao vivo das campanhas ficou pronto. Leia o snapshot e me dê o resumo: a melhor, a pior e uma recomendação com número.',
+            history,
+          );
+          const reply = data?.reply ?? 'Puxei os números, mas não consegui resumir agora.';
+          push({ role: 'assistant', text: reply });
+          await voice.speak(reply, ttsVoice);
+          return;
+        }
+      }
+      const msg = 'Os números demoraram a chegar. Tenta de novo em instantes.';
+      push({ role: 'assistant', text: msg });
+      await voice.speak(msg, ttsVoice);
+    },
+    [postChat, push, voice, ttsVoice],
+  );
+
   // Envia uma mensagem ao Nexus e FALA a resposta. Resolve só quando o áudio termina, para que o
   // loop de mãos-livres só volte a escutar depois que o Nexus parar de falar.
   const send = useCallback(
@@ -53,6 +118,7 @@ export function NexusWidget() {
       setInput('');
       setLoading(true);
       let reply: string | null = null;
+      let snapshot: SnapshotTrigger | null = null;
       try {
         const history = messages.map((m) => ({ role: m.role, content: m.text }));
         const res = await fetch('/api/nexus/chat', {
@@ -82,13 +148,23 @@ export function NexusWidget() {
         push({ role: 'assistant', text: data.reply });
         setPending(data.pending ?? null);
         reply = data.reply;
+        snapshot = data.snapshot ?? null;
       } finally {
         setLoading(false);
       }
       // Fala fora do bloco de loading: a UI já liberou, mas o caller (mãos-livres) aguarda o áudio.
       if (reply) await voice.speak(reply, ttsVoice);
+      // Raio-x ao vivo disparado: aguarda ficar pronto e narra (o mãos-livres só re-escuta depois).
+      if (snapshot) {
+        const history: HistoryTurn[] = [
+          ...messages.map((m) => ({ role: m.role, content: m.text })),
+          { role: 'user', content: trimmed },
+          { role: 'assistant', content: reply ?? '' },
+        ];
+        await pollAndNarrate(snapshot.jobId, history);
+      }
     },
-    [loading, messages, push, voice, ttsVoice],
+    [loading, messages, push, voice, ttsVoice, pollAndNarrate],
   );
 
   // Mãos-livres: cada fala detectada vira um turno. Pausa a escuta durante o processamento (anti-eco

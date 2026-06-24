@@ -20,7 +20,11 @@ import {
   listAnalysesByClient,
   listFunnelEvents,
 } from '../../services/analyses';
+import { getLatestSnapshot } from '../../services/live-snapshots';
 import { AGENCY_SCOPE } from '../../multitenant/scope';
+
+// Cliente default do template quando o operador não nomeia um (há só um cadastrado).
+const DEFAULT_CLIENT_SLUG = 'cliente-exemplo';
 
 export interface ChatPending {
   id: string;
@@ -33,6 +37,9 @@ export interface ChatResult {
   reply: string;
   pending?: ChatPending;
   job?: { status: 'enqueued' | 'already_active'; jobId: string | null };
+  // Onda 16 — quando o Nexus dispara um raio-x ao vivo (read-only): a UI faz polling até ficar pronto
+  // e então envia um turno de follow-up para o Nexus narrar. jobId null quando já havia um em curso.
+  snapshot?: { status: 'enqueued' | 'already_active'; jobId: string | null };
 }
 
 function textOf(content: AnthropicContentBlock[]): string {
@@ -72,6 +79,18 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
     const latest = await getLatestAnalysis(AGENCY_SCOPE);
     return JSON.stringify(
       latest ? { analysis: latest, events: await listFunnelEvents(latest.id) } : null,
+    );
+  }
+  if (name === 'get_live_snapshot') {
+    // Lê o raio-x já PRONTO do banco (read-only). Filtra por cliente quando dado; senão o mais recente.
+    const clientId = clientSlug
+      ? ((await getClientBySlug(AGENCY_SCOPE, clientSlug))?.id ?? undefined)
+      : undefined;
+    const snap = await getLatestSnapshot(AGENCY_SCOPE, clientId);
+    return JSON.stringify(
+      snap
+        ? { status: 'ready', period: snap.period, ...(snap.payload as object) }
+        : { status: 'pending' },
     );
   }
   return JSON.stringify({ error: 'unknown_read_tool' });
@@ -130,6 +149,31 @@ function proposeWrite(tool: AnthropicToolUseBlock, leadingText: string): ChatRes
   };
 }
 
+/**
+ * Snapshot ao vivo (Onda 16): a tool request_live_snapshot ENFILEIRA um job read-only (sem
+ * confirmação — não muta nada e não gasta) e devolve o jobId para a UI fazer polling. Reusa a
+ * allowlist (slug fixo 'live-snapshot') e o montador de linha da fila. NÃO escreve na Meta.
+ */
+async function requestSnapshot(
+  tool: AnthropicToolUseBlock,
+  leadingText: string,
+): Promise<ChatResult> {
+  const { client_slug, period } = tool.input;
+  const slug = typeof client_slug === 'string' && client_slug ? client_slug : DEFAULT_CLIENT_SLUG;
+  const args = { client_slug: slug, ...(typeof period === 'string' ? { period } : {}) };
+  const id = globalThis.crypto.randomUUID();
+  const pending = buildPendingAction('live-snapshot', args, { id });
+  if (pending === null) {
+    return { reply: 'Não consegui puxar os números agora.' };
+  }
+  const clientId = (await getClientBySlug(AGENCY_SCOPE, slug))?.id ?? null;
+  const result = await enqueueJob(buildAgentJobRow(clientId, pending));
+  return {
+    reply: leadingText || 'Deixa eu puxar os números agora…',
+    snapshot: { status: result.status, jobId: result.jobId },
+  };
+}
+
 const MAX_TOOL_ROUNDS = 5;
 
 /**
@@ -163,6 +207,12 @@ export async function runChatTurn(input: {
     const write = uses.find((u) => classifyTool(u.name) === 'write');
     if (write) {
       return proposeWrite(write, text);
+    }
+
+    // Snapshot ao vivo: enfileira (read-only, sem confirmação) e encerra para a UI fazer polling.
+    const snapshot = uses.find((u) => classifyTool(u.name) === 'snapshot');
+    if (snapshot) {
+      return requestSnapshot(snapshot, text);
     }
 
     // Caso contrário, executa TODAS as leituras desta rodada e devolve um tool_result por tool_use.

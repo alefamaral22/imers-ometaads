@@ -22,6 +22,7 @@ import { listAnalyses, getLatestAnalysis, listFunnelEvents } from '../../../lib/
 import { listLandingPages } from '../../../lib/services/landing-pages';
 import { listOperationLogs } from '../../../lib/services/logs';
 import { listNarrations } from '../../../lib/services/narrations';
+import { getLatestSnapshot, getSnapshotByJobId } from '../../../lib/services/live-snapshots';
 import {
   chatRequestSchema,
   confirmRequestSchema,
@@ -285,6 +286,30 @@ app.post('/data/api-keys', async (c) => {
   const scope = scopeFromClaims(claims);
   const apiKey = await upsertApiKey(scope, parsed.data);
   return c.json({ apiKey }, 201);
+});
+
+// Snapshot ao vivo (Onda 16) — leitura escopada por account para o POLLING da UI. Gated
+// (super_admin/socio) com auth/authz inline, mas FORA do rate-limit do Nexus (polling frequente):
+// registrada ANTES do middleware /nexus/* de propósito, então aquele middleware não a intercepta.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+app.get('/nexus/snapshot', async (c) => {
+  const claims = await apiClaims(c);
+  if (!isAuthenticated(claims)) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
+  const jobId = c.req.query('jobId');
+  if (jobId !== undefined && !UUID_RE.test(jobId)) return c.json({ error: 'invalid_request' }, 400);
+  const scope = scopeFromClaims(claims);
+  const snap = jobId ? await getSnapshotByJobId(scope, jobId) : await getLatestSnapshot(scope);
+  if (!snap) return c.json({ status: 'pending' });
+  return c.json({
+    status: 'ready',
+    snapshot: {
+      jobId: snap.job_id,
+      period: snap.period,
+      payload: snap.payload,
+      createdAt: snap.created_at,
+    },
+  });
 });
 
 // ── Nexus (protected: auth → authz → rate limit → validation → logic) ──────────
