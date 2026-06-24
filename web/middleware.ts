@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { SESSION_COOKIE_NAME, isAuthorizedOperator } from './lib/auth/domain';
+import { SESSION_COOKIE_NAME, isAuthenticated } from './lib/auth/domain';
 import { verifySession } from './lib/auth/session';
 import { buildSecurityHeaders, generateNonce } from './lib/security/headers';
 
@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const authSecret = process.env.AUTH_SECRET ?? '';
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const claims = await verifySession(token, authSecret);
-  const authed = isAuthorizedOperator(claims);
+  const authed = isAuthenticated(claims);
 
   let response: NextResponse;
 

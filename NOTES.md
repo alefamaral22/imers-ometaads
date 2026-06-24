@@ -517,6 +517,30 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   (`fly secrets` + Vercel) para a escrita sair do 503; (3) `.env.example` espelhar as 2 chaves (arquivo
   bloqueado por permissão nesta sessão — está em `types/env.d.ts` e `web/lib/env.ts`).
 
+### Onda 13 — Auth por account (login multi-tenant) ✅ (commit nesta sessão)
+- **Spec/ADR/threat model:** `docs/specs/SPEC-auth-por-account.md` (Approved-design), ADR
+  `0029-auth-por-account`, threat model `docs/security/threats/auth-por-account.md`.
+- **Migration** `20260624130000_auth_por_account.sql` **aplicada ao banco vivo via MCP**: `accounts`
+  ganhou `email citext unique` + `password_hash text` + `last_login_at`. Aditiva (colunas nullable;
+  sem backfill — âncora pega senha via script/bootstrap).
+- **Decisões (validadas):** JWT custom estendido (sessão = `{sub:account_id, role, slug}`); email como
+  login; **scrypt** (`node:crypto`, formato `scrypt$salt$hash`, sem dependência nova); `socio` =
+  super_admin reduzido (vê tudo, sem ações privilegiadas).
+- **Puros (testados):** `web/lib/auth/password.ts` (scrypt hash/verify fail-closed), `domain.ts`
+  (claims por account, `buildClaims`/`isAuthenticated`/`hasRole`, login por email), `multitenant/scope.ts`
+  (`GLOBAL_VISIBILITY={super_admin,socio}`, `scopeFromClaims`). +12 testes (289 total).
+- **Infra/UI:** `session.ts` assina/verifica as novas claims; `server.ts` `requireOperator`(autenticado)
+  + `requireRole`; `middleware.ts` `isAuthenticated`; `/auth/login` resolve por email→scrypt, com
+  **bootstrap legado** (DASHBOARD_PASSWORD→âncora super_admin) até a âncora ter senha; API deriva scope
+  das claims (`scopeFromClaims`), não mais de `getCurrentScope` fixo; login UI ganhou campo email;
+  Shell mostra a conta logada (slug + papel). Script `scripts/onda13/set-account-password.ts` (seta
+  email+senha scrypt de uma account por slug).
+- Gates: lint/typecheck/test(289)/format + `cd web && next build` **verdes** (rotas `/login` e `/settings`).
+- ⚠️ **Deploy invalida sessões antigas:** as claims mudaram de shape → cookies antigos viram sessão
+  nula → operador re-loga (email qualquer + `DASHBOARD_PASSWORD` via bootstrap). Esperado. Para a âncora
+  ter login por email real: rodar `set-account-password.ts acme <email> <senha>`.
+- ⚠️ **Não exercitado ao vivo** (sem deploy ainda); lógica de auth/scope 100% testada.
+
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
   builder remoto batia em TLS x509 na rede do operador), `.dockerignore` p/ não copiar `node_modules`

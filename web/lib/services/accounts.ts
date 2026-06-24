@@ -1,23 +1,64 @@
 import 'server-only';
-import { selectRows } from '../db/client';
+import { selectRows, patchRows } from '../db/client';
 import { accountRowSchema, parseRows, type AccountRow } from '../domain/schemas';
-import type { AccountScope } from '../multitenant/scope';
+import { readSession } from '../auth/server';
+import { scopeFromClaims, type AccountScope } from '../multitenant/scope';
+import type { AccountRole } from '../auth/domain';
 
 /**
- * Server-side reads of public.accounts (RLS closed to the browser, ADR 0002/0026). No row carries a
- * secret. The dashboard operator is the agency super_admin; the anchor account ('acme') is the
- * "current" account used when creating tenant-owned resources.
+ * Server-side reads of public.accounts (RLS closed to the browser, ADR 0002/0026). The account list
+ * never carries a secret; the login query (below) reads password_hash but it stays server-side.
  */
 export async function listAccounts(): Promise<AccountRow[]> {
   const rows = await selectRows('accounts', { order: 'created_at.asc' });
   return parseRows(accountRowSchema, rows);
 }
 
-/** The agency super_admin account. The single-operator session maps to this scope (MVP). */
+/** Scope da sessão atual (ADR 0029). Lança se não houver sessão — chamado atrás de requireOperator. */
 export async function getCurrentScope(): Promise<AccountScope> {
-  const rows = await selectRows('accounts', { eq: { role: 'super_admin' }, limit: 1 });
-  const parsed = parseRows(accountRowSchema, rows);
-  const anchor = parsed[0];
-  if (!anchor) throw new Error('no super_admin account found (run the multi-tenant migration)');
-  return { role: 'super_admin', accountId: anchor.id };
+  const claims = await readSession();
+  if (!claims) throw new Error('no session');
+  return scopeFromClaims(claims);
+}
+
+export interface LoginAccount {
+  id: string;
+  role: AccountRole;
+  slug: string;
+  passwordHash: string | null;
+}
+
+/** Resolve uma account ativa por email para o login. password_hash fica server-side (nunca exposto). */
+export async function getLoginAccountByEmail(email: string): Promise<LoginAccount | null> {
+  const rows = await selectRows('accounts', {
+    select: 'id,role,slug,password_hash',
+    eq: { email, is_active: 'true' },
+    limit: 1,
+  });
+  const row = rows[0] as
+    | { id?: string; role?: AccountRole; slug?: string; password_hash?: string | null }
+    | undefined;
+  if (!row?.id || !row.role || !row.slug) return null;
+  return { id: row.id, role: row.role, slug: row.slug, passwordHash: row.password_hash ?? null };
+}
+
+/** A account-âncora super_admin — usada pelo bootstrap legado (DASHBOARD_PASSWORD). */
+export async function getSuperAdminAnchor(): Promise<{
+  id: string;
+  role: AccountRole;
+  slug: string;
+} | null> {
+  const rows = await selectRows('accounts', {
+    select: 'id,role,slug',
+    eq: { role: 'super_admin', is_active: 'true' },
+    limit: 1,
+  });
+  const row = rows[0] as { id?: string; role?: AccountRole; slug?: string } | undefined;
+  if (!row?.id || !row.role || !row.slug) return null;
+  return { id: row.id, role: row.role, slug: row.slug };
+}
+
+/** Marca o último login (best-effort; não bloqueia o fluxo se falhar). */
+export async function touchLastLogin(accountId: string): Promise<void> {
+  await patchRows('accounts', { id: accountId }, { last_login_at: new Date().toISOString() });
 }

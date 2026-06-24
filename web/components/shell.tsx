@@ -2,6 +2,13 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { LogoutButton } from './logout-button';
 import { NexusWidget } from './nexus/nexus-widget';
+import { readSession } from '../lib/auth/server';
+
+const ROLE_LABEL: Record<string, string> = {
+  super_admin: 'agência',
+  socio: 'sócio',
+  cliente_usuario: 'cliente',
+};
 
 const NAV = [
   { href: '/', label: 'Visão geral' },
@@ -12,7 +19,8 @@ const NAV = [
 ] as const;
 
 /** Authenticated dashboard chrome: top nav + content container. Server component. */
-export function Shell({ children }: { children: ReactNode }) {
+export async function Shell({ children }: { children: ReactNode }) {
+  const session = await readSession();
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <nav className="border-b border-neutral-800 bg-neutral-900/60">
@@ -33,7 +41,17 @@ export function Shell({ children }: { children: ReactNode }) {
               ))}
             </div>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-3">
+            {session ? (
+              <span className="text-xs text-neutral-400">
+                {session.slug}
+                <span className="ml-1 rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-300">
+                  {ROLE_LABEL[session.role] ?? session.role}
+                </span>
+              </span>
+            ) : null}
+            <LogoutButton />
+          </div>
         </div>
       </nav>
       <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>

@@ -1,10 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
-import {
-  SESSION_TTL_SECONDS,
-  buildOperatorClaims,
-  sessionClaimsSchema,
-  type SessionClaims,
-} from './domain';
+import { SESSION_TTL_SECONDS, sessionClaimsSchema, type SessionClaims } from './domain';
 
 /**
  * Session infrastructure: signs/verifies the JWT cookie with HS256 using AUTH_SECRET.
@@ -21,9 +16,8 @@ function secretKey(authSecret: string): Uint8Array {
   return new TextEncoder().encode(authSecret);
 }
 
-export async function signSession(authSecret: string): Promise<string> {
-  const claims = buildOperatorClaims();
-  return new SignJWT({ role: claims.role })
+export async function signSession(claims: SessionClaims, authSecret: string): Promise<string> {
+  return new SignJWT({ role: claims.role, slug: claims.slug })
     .setProtectedHeader({ alg: JWT_ALG })
     .setSubject(claims.sub)
     .setIssuer(JWT_ISSUER)
@@ -45,7 +39,11 @@ export async function verifySession(
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     });
-    const parsed = sessionClaimsSchema.safeParse({ sub: payload.sub, role: payload.role });
+    const parsed = sessionClaimsSchema.safeParse({
+      sub: payload.sub,
+      role: payload.role,
+      slug: payload.slug,
+    });
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

@@ -5,11 +5,14 @@ import { serverEnv, isTurnstileEnabled, publicEnv } from '../../../lib/env';
 import {
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
-  isAuthorizedOperator,
+  isAuthenticated,
+  buildClaims,
   loginInputSchema,
   passwordMatches,
+  type SessionClaims,
 } from '../../../lib/auth/domain';
 import { signSession, verifySession, sha256Hex } from '../../../lib/auth/session';
+import { verifyPassword } from '../../../lib/auth/password';
 import { verifyTurnstile } from '../../../lib/auth/turnstile';
 import { limitLogin, limitNexus } from '../../../lib/ratelimit';
 import { listClients, getClientBySlug } from '../../../lib/services/clients';
@@ -32,20 +35,32 @@ import { editSectionSchema, startWatchSchema } from '../../../lib/landing/edit';
 import { editSection } from '../../../lib/services/landing-sections';
 import { startWatch } from '../../../lib/services/watches';
 import { isSecretsVaultEnabled } from '../../../lib/env';
-import { listAccounts, getCurrentScope } from '../../../lib/services/accounts';
+import {
+  listAccounts,
+  getLoginAccountByEmail,
+  getSuperAdminAnchor,
+  touchLastLogin,
+} from '../../../lib/services/accounts';
 import { listConnections, createConnection } from '../../../lib/services/connections';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { createConnectionSchema, upsertApiKeySchema } from '../../../lib/multitenant/requests';
+import { scopeFromClaims } from '../../../lib/multitenant/scope';
 
 export const runtime = 'nodejs';
 
 const app = new Hono().basePath('/api');
 
-/** Authz middleware for protected API routes: verify cookie -> require operator role. */
-async function requireOperatorApi(c: Parameters<Parameters<typeof app.use>[1]>[0]) {
+/** Verify the session cookie and return the claims (or null). */
+async function apiClaims(
+  c: Parameters<Parameters<typeof app.use>[1]>[0],
+): Promise<SessionClaims | null> {
   const token = getCookie(c, SESSION_COOKIE_NAME);
-  const claims = await verifySession(token, serverEnv().AUTH_SECRET);
-  return isAuthorizedOperator(claims);
+  return verifySession(token, serverEnv().AUTH_SECRET);
+}
+
+/** Authz middleware for protected API routes: verify cookie -> require an authenticated session. */
+async function requireOperatorApi(c: Parameters<Parameters<typeof app.use>[1]>[0]) {
+  return isAuthenticated(await apiClaims(c));
 }
 
 function clientIp(c: { req: { header: (n: string) => string | undefined } }): string {
@@ -81,13 +96,28 @@ app.post('/auth/login', async (c) => {
     if (!ok) return c.json({ error: 'turnstile_failed' }, 403);
   }
 
-  // 4) logic: compare SHA-256 of the submitted password to the configured digest.
-  const submittedDigest = await sha256Hex(parsed.data.password);
-  if (!passwordMatches(submittedDigest, env.DASHBOARD_PASSWORD)) {
+  // 4) logic: resolve the account by email and verify the scrypt password. Falls back to the legacy
+  // super_admin bootstrap (DASHBOARD_PASSWORD, SHA-256) while the anchor has no real password set —
+  // so the agency operator is never locked out during the migration (ADR 0029).
+  const { email, password } = parsed.data;
+  let claims: SessionClaims | null = null;
+
+  const account = await getLoginAccountByEmail(email);
+  if (account?.passwordHash && verifyPassword(password, account.passwordHash)) {
+    claims = buildClaims(account);
+  } else {
+    const submittedDigest = await sha256Hex(password);
+    if (passwordMatches(submittedDigest, env.DASHBOARD_PASSWORD)) {
+      const anchor = await getSuperAdminAnchor();
+      if (anchor) claims = buildClaims(anchor);
+    }
+  }
+
+  if (!claims) {
     return c.json({ error: 'invalid_credentials' }, 401);
   }
 
-  const token = await signSession(env.AUTH_SECRET);
+  const token = await signSession(claims, env.AUTH_SECRET);
   setCookie(c, SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: true,
@@ -95,6 +125,7 @@ app.post('/auth/login', async (c) => {
     path: '/',
     maxAge: SESSION_TTL_SECONDS,
   });
+  await touchLastLogin(claims.sub).catch(() => {});
   return c.json({ ok: true });
 });
 
@@ -138,7 +169,9 @@ app.get('/data/logs', async (c) => c.json({ logs: await listOperationLogs() }));
 app.get('/data/accounts', async (c) => c.json({ accounts: await listAccounts() }));
 
 app.get('/data/connections', async (c) => {
-  const scope = await getCurrentScope();
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const scope = scopeFromClaims(claims);
   return c.json({ connections: await listConnections(scope) });
 });
 
@@ -147,13 +180,17 @@ app.post('/data/connections', async (c) => {
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = createConnectionSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
-  const scope = await getCurrentScope();
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const scope = scopeFromClaims(claims);
   const connection = await createConnection(scope, parsed.data);
   return c.json({ connection }, 201);
 });
 
 app.get('/data/api-keys', async (c) => {
-  const scope = await getCurrentScope();
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const scope = scopeFromClaims(claims);
   return c.json({ apiKeys: await listApiKeys(scope) });
 });
 
@@ -162,7 +199,9 @@ app.post('/data/api-keys', async (c) => {
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = upsertApiKeySchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
-  const scope = await getCurrentScope();
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const scope = scopeFromClaims(claims);
   const apiKey = await upsertApiKey(scope, parsed.data);
   return c.json({ apiKey }, 201);
 });
