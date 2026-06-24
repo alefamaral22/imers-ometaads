@@ -24,6 +24,10 @@ export const serverEnvSchema = z.object({
     .regex(/^[0-9a-f]{64}$/i, 'DASHBOARD_PASSWORD must be a SHA-256 hex digest'),
   // Session signing key: >= 32 bytes of entropy.
   AUTH_SECRET: z.string().min(32, 'AUTH_SECRET must be at least 32 characters'),
+  // Onda 12 — cripto dos segredos por tenant (AES-256-GCM; 32 bytes hex/base64). Opcionais no schema
+  // para o build/login não exigirem; o serviço que cifra falha com erro claro se faltarem.
+  AD_TOKEN_ENC_KEY: z.string().trim().optional(), // cifra tokens Meta em ad_account_connections
+  API_KEY_ENC_KEY: z.string().trim().optional(), // cifra keys de provedor em api_keys_clientes
   // Optional: Turnstile (bot protection on login) is enabled only when both are present.
   CLOUDFLARE_TURNSTILE_SECRET_KEY: z.string().trim().optional(),
   // Optional: Upstash rate limiting on the login endpoint.
@@ -90,6 +94,13 @@ export function isRateLimitEnabled(
   server: Pick<ServerEnv, 'UPSTASH_REDIS_REST_URL' | 'UPSTASH_REDIS_REST_TOKEN'>,
 ): boolean {
   return Boolean(server.UPSTASH_REDIS_REST_URL && server.UPSTASH_REDIS_REST_TOKEN);
+}
+
+// Onda 12 — o cofre de segredos por tenant só aceita escrita quando as duas chaves de cripto existem.
+export function isSecretsVaultEnabled(
+  server: Pick<ServerEnv, 'AD_TOKEN_ENC_KEY' | 'API_KEY_ENC_KEY'>,
+): boolean {
+  return Boolean(server.AD_TOKEN_ENC_KEY && server.API_KEY_ENC_KEY);
 }
 
 // Nexus capability flags — pure, also covered by tests. Each feature degrades when its key is absent.

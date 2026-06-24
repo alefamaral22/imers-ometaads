@@ -31,6 +31,11 @@ import { NexusUnavailableError } from '../../../lib/nexus/infra/anthropic';
 import { editSectionSchema, startWatchSchema } from '../../../lib/landing/edit';
 import { editSection } from '../../../lib/services/landing-sections';
 import { startWatch } from '../../../lib/services/watches';
+import { isSecretsVaultEnabled } from '../../../lib/env';
+import { listAccounts, getCurrentScope } from '../../../lib/services/accounts';
+import { listConnections, createConnection } from '../../../lib/services/connections';
+import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
+import { createConnectionSchema, upsertApiKeySchema } from '../../../lib/multitenant/requests';
 
 export const runtime = 'nodejs';
 
@@ -126,6 +131,41 @@ app.get('/data/funnel', async (c) => {
 app.get('/data/landing-pages', async (c) => c.json({ landingPages: await listLandingPages() }));
 
 app.get('/data/logs', async (c) => c.json({ logs: await listOperationLogs() }));
+
+// ── Onda 12 — multi-tenant: accounts, conexões Meta e chaves de API ────────────
+// Leituras projetam só colunas de DISPLAY (o cipher do token/chave NUNCA é selecionado). Escritas
+// cifram server-side. Escopo por account (super_admin vê tudo). O segredo nunca volta na resposta.
+app.get('/data/accounts', async (c) => c.json({ accounts: await listAccounts() }));
+
+app.get('/data/connections', async (c) => {
+  const scope = await getCurrentScope();
+  return c.json({ connections: await listConnections(scope) });
+});
+
+app.post('/data/connections', async (c) => {
+  if (!isSecretsVaultEnabled(serverEnv())) return c.json({ error: 'vault_unconfigured' }, 503);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createConnectionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const scope = await getCurrentScope();
+  const connection = await createConnection(scope, parsed.data);
+  return c.json({ connection }, 201);
+});
+
+app.get('/data/api-keys', async (c) => {
+  const scope = await getCurrentScope();
+  return c.json({ apiKeys: await listApiKeys(scope) });
+});
+
+app.post('/data/api-keys', async (c) => {
+  if (!isSecretsVaultEnabled(serverEnv())) return c.json({ error: 'vault_unconfigured' }, 503);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = upsertApiKeySchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const scope = await getCurrentScope();
+  const apiKey = await upsertApiKey(scope, parsed.data);
+  return c.json({ apiKey }, 201);
+});
 
 // ── Nexus (protected: auth → authz → rate limit → validation → logic) ──────────
 app.use('/nexus/*', async (c, next) => {

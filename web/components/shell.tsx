@@ -8,6 +8,7 @@ const NAV = [
   { href: '/analyses', label: 'Análises' },
   { href: '/funnel', label: 'Funil' },
   { href: '/landing-pages', label: 'Landing pages' },
+  { href: '/settings', label: 'Conexões & chaves' },
 ] as const;
 
 /** Authenticated dashboard chrome: top nav + content container. Server component. */

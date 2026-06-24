@@ -26,6 +26,62 @@ export const clientRowSchema = z.object({
 });
 export type ClientRow = z.infer<typeof clientRowSchema>;
 
+// ── Onda 12 — multi-tenant ─────────────────────────────────────────────────────
+// public.accounts
+export const accountRole = z.enum(['super_admin', 'socio', 'cliente_usuario']);
+export const accountRowSchema = z.object({
+  id: z.string().uuid(),
+  slug: z.string(),
+  name: z.string(),
+  role: accountRole,
+  plan: z.string(),
+  subscription_status: z.string(),
+  is_active: z.boolean(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type AccountRow = z.infer<typeof accountRowSchema>;
+
+// public.ad_account_connections — projeção de DISPLAY: NUNCA inclui access_token_cipher.
+export const connectionStatus = z.enum(['unverified', 'active', 'invalid', 'revoked']);
+export const connectionDisplaySchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid(),
+  client_id: z.string().uuid().nullable(),
+  meta_ad_account_id: z.string(),
+  connection_method: z.enum(['manual_token', 'oauth_meta']),
+  status: connectionStatus,
+  access_token_last4: z.string().nullable(),
+  token_label: z.string().nullable(),
+  last_validated_at: ts.nullable(),
+  last_validation_error: z.string().nullable(),
+  connected_at: ts,
+  created_at: ts,
+  updated_at: ts,
+});
+export type ConnectionDisplay = z.infer<typeof connectionDisplaySchema>;
+
+// public.api_keys_clientes — projeção de DISPLAY: NUNCA inclui key_cipher.
+export const apiKeyDisplaySchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid(),
+  provider: z.enum(['anthropic', 'openai', 'elevenlabs', 'minimax', 'other']),
+  label: z.string().nullable(),
+  key_last4: z.string().nullable(),
+  status: z.enum(['unverified', 'active', 'invalid']),
+  last_validated_at: ts.nullable(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type ApiKeyDisplay = z.infer<typeof apiKeyDisplaySchema>;
+
+// Colunas de DISPLAY (sem segredo) que os serviços projetam no select. Manter em sincronia com os
+// schemas acima — o cipher NUNCA entra aqui, logo nunca sai do servidor.
+export const CONNECTION_DISPLAY_COLUMNS =
+  'id,account_id,client_id,meta_ad_account_id,connection_method,status,access_token_last4,token_label,last_validated_at,last_validation_error,connected_at,created_at,updated_at';
+export const API_KEY_DISPLAY_COLUMNS =
+  'id,account_id,provider,label,key_last4,status,last_validated_at,created_at,updated_at';
+
 // public.campaigns
 export const entityStatus = z.enum(['ACTIVE', 'PAUSED', 'ARCHIVED', 'DELETED']);
 export const campaignRowSchema = z.object({

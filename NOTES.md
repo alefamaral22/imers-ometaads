@@ -492,8 +492,25 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   - ⚠️ **Não exercitado ao vivo:** sem conexões/tenants reais nem `*_ENC_KEY` setadas; lógica de decisão
     100% testada. Para o runner aplicar, falta `fly secrets set AD_TOKEN_ENC_KEY/API_KEY_ENC_KEY` +
     redeploy (dormant até existir tenant não-super_admin). `.env.example` ainda não espelha as 2 chaves.
-- ⚠️ **Pendente (etapa 4):** serviços/telas do dashboard (conexões/chaves, só `last4`) + acessador
-  `withAccount`. Spec §9.
+- **Etapa 4 ✅ (commit nesta sessão):** dashboard — fundação multi-tenant + API + página de leitura.
+  - **Puros (testados):** `web/lib/multitenant/scope.ts` (`scopeEq`/`canManageAccount` — super_admin vê
+    tudo, demais só a própria account; isolamento Opção A num só ponto), `secrets.ts` (AES-256-GCM
+    espelhando o formato do runner; teste **decifra com o algoritmo do runner** = prova de
+    compatibilidade), `requests.ts` (Zod das mutações). +14 testes (277 total).
+  - **Serviços server-side:** `accounts.ts` (`getCurrentScope` = super_admin âncora), `connections.ts`,
+    `api-keys.ts` — leitura projeta **só colunas de DISPLAY** (cipher NUNCA no select → nunca sai do
+    servidor); escrita cifra (`enc-keys.ts` lê AD_TOKEN/API_KEY) e guarda só `last4`. Rotação de key =
+    upsert por `(account, provider)`.
+  - **API Hono** sob `/data/*`: GET accounts/connections/api-keys + POST connections/api-keys (cifram;
+    guarda `isSecretsVaultEnabled` → 503 sem as chaves). **Página** `app/settings` (Conexões & chaves,
+    só `••••last4` + status + datas) + link no nav. envs `AD_TOKEN_ENC_KEY`/`API_KEY_ENC_KEY` (opcionais)
+    + flag `isSecretsVaultEnabled` em `web/lib/env.ts`.
+  - Gates: lint/typecheck/test (277)/format + `cd web && npm run build` **verdes** (rota `/settings`).
+  - ⚠️ **Não exercitado ao vivo** (sem `*_ENC_KEY` setadas na Vercel; leitura funciona, escrita dá 503).
+    **Forms de cadastro** ficam para um próximo passo (criação hoje via API/Nexus). `.env.example` ainda
+    não espelha as 2 chaves (arquivo bloqueado por permissão nesta sessão).
+- **Onda 12 — schema/segurança/runner/dashboard prontos.** Falta só: evolução do modelo de **auth**
+  para login por account (hoje operador único = super_admin) + forms de cadastro + go-live das envs.
 
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
