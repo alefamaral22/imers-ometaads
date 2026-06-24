@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { scopeEq, canManageAccount, scopeFromClaims, type AccountScope } from './scope';
+import {
+  scopeEq,
+  canManageAccount,
+  scopeFromClaims,
+  clientScopeFilter,
+  type AccountScope,
+} from './scope';
 
 const ACME = 'acme-account-id';
 const OTHER = 'other-account-id';
@@ -37,5 +43,20 @@ describe('scopeFromClaims', () => {
       role: 'cliente_usuario',
       accountId: ACME,
     });
+  });
+});
+
+describe('clientScopeFilter', () => {
+  it('null (visibilidade global) → all (sem filtro)', () => {
+    expect(clientScopeFilter(null)).toEqual({ kind: 'all' });
+  });
+
+  it('REGRESSÃO: restrito com 0 clientes NUNCA vira "sem filtro" → none (resultado vazio)', () => {
+    // Reproduz o vazamento: uma account de cliente sem clientes deve ver ZERO, não tudo.
+    expect(clientScopeFilter([])).toEqual({ kind: 'none' });
+  });
+
+  it('restrito com clientes → filtra por client_id IN (...)', () => {
+    expect(clientScopeFilter(['c1', 'c2'])).toEqual({ kind: 'in', clientIds: ['c1', 'c2'] });
   });
 });

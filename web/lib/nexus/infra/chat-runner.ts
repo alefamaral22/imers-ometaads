@@ -20,6 +20,7 @@ import {
   listAnalysesByClient,
   listFunnelEvents,
 } from '../../services/analyses';
+import { AGENCY_SCOPE } from '../../multitenant/scope';
 
 export interface ChatPending {
   id: string;
@@ -49,25 +50,26 @@ function toolUses(content: AnthropicContentBlock[]): AnthropicToolUseBlock[] {
 /** Executa uma tool de leitura no servidor (read-only) e devolve um JSON string como tool_result. */
 async function executeReadTool(name: string, input: Record<string, unknown>): Promise<string> {
   const clientSlug = typeof input.client_slug === 'string' ? input.client_slug : undefined;
+  // Nexus já é restrito a super_admin/socio (API /nexus/*); as leituras são da agência (global scope).
   if (name === 'get_clients') {
-    return JSON.stringify(await listClients());
+    return JSON.stringify(await listClients(AGENCY_SCOPE));
   }
   if (name === 'get_campaigns') {
     if (clientSlug) {
-      const client = await getClientBySlug(clientSlug);
+      const client = await getClientBySlug(AGENCY_SCOPE, clientSlug);
       return JSON.stringify(client ? await listCampaignsByClient(client.id) : []);
     }
-    return JSON.stringify(await listAllCampaigns());
+    return JSON.stringify(await listAllCampaigns(AGENCY_SCOPE));
   }
   if (name === 'get_analyses') {
     if (clientSlug) {
-      const client = await getClientBySlug(clientSlug);
+      const client = await getClientBySlug(AGENCY_SCOPE, clientSlug);
       return JSON.stringify(client ? await listAnalysesByClient(client.id) : []);
     }
-    return JSON.stringify(await listAnalyses(20));
+    return JSON.stringify(await listAnalyses(AGENCY_SCOPE, 20));
   }
   if (name === 'get_funnel') {
-    const latest = await getLatestAnalysis();
+    const latest = await getLatestAnalysis(AGENCY_SCOPE);
     return JSON.stringify(
       latest ? { analysis: latest, events: await listFunnelEvents(latest.id) } : null,
     );
@@ -94,7 +96,7 @@ export async function confirmAndEnqueue(input: {
     return { reply: 'Confirmação inválida — nada foi enfileirado.' };
   }
   const clientId = pending.args.client_slug
-    ? ((await getClientBySlug(pending.args.client_slug))?.id ?? null)
+    ? ((await getClientBySlug(AGENCY_SCOPE, pending.args.client_slug))?.id ?? null)
     : null;
   const row = buildAgentJobRow(clientId, pending);
   const result = await enqueueJob(row);

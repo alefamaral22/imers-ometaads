@@ -7,6 +7,8 @@ import {
   type DailySummaryRow,
   type OperationLogRow,
 } from '../domain/schemas';
+import { clientScopeFilter, type AccountScope } from '../multitenant/scope';
+import { accountClientIds } from './clients';
 
 export interface OperationLogInput {
   entityType: string;
@@ -31,8 +33,21 @@ export async function writeOperationLog(input: OperationLogInput): Promise<void>
   ]);
 }
 
-export async function listOperationLogs(limit = 100): Promise<OperationLogRow[]> {
-  const rows = await selectRows('operation_logs', { order: 'created_at.desc', limit });
+/**
+ * Logs de operação escopados por account (Onda 15). Restrito → só logs dos clientes da account; logs
+ * de nível-plataforma (client_id null, ex. criação de account) só aparecem para visibilidade global.
+ */
+export async function listOperationLogs(
+  scope: AccountScope,
+  limit = 100,
+): Promise<OperationLogRow[]> {
+  const filter = clientScopeFilter(await accountClientIds(scope));
+  if (filter.kind === 'none') return [];
+  const rows = await selectRows('operation_logs', {
+    order: 'created_at.desc',
+    limit,
+    ...(filter.kind === 'in' ? { in: { client_id: filter.clientIds } } : {}),
+  });
   return parseRows(operationLogRowSchema, rows);
 }
 

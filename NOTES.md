@@ -562,6 +562,27 @@ operação real; 6 precede 7; 8 precede 9 e 10.
 - ⚠️ **Não exercitado ao vivo** (sem deploy). Fora de escopo (fase seguinte): `account_members`
   (multiusuário), billing real, "agir como"/switcher, signup público.
 
+### Onda 15 — Isolamento das leituras operacionais por account ✅ (commit nesta sessão)
+- **Bug corrigido (vazamento entre tenants):** as Ondas 12/13 escopavam só as tabelas do cofre; as
+  leituras operacionais (`clients`, `campaigns`, `analyses`, `funnel`, `landing_pages`, `operation_logs`)
+  liam **tudo, sem filtro de account**. Conta `teste` (cliente_usuario, 0 clientes) via a agência inteira.
+- **Spec/ADR/threat model:** `docs/specs/SPEC-isolamento-leituras-operacionais.md`, ADR
+  `0031-isolamento-leituras-operacionais`, threat model homônimo. **Sem migration, sem mexer no runner.**
+- **Choke-point puro (testado):** `clientScopeFilter(ids)` em `multitenant/scope.ts` → `all` (global) |
+  `none` (restrito sem clientes ⇒ vazio, **nunca** "sem filtro" — mata a causa-raiz) | `in`. +3 testes
+  (incl. regressão `clientScopeFilter([])===none`). **302 testes** no total.
+- **Serviços escopados:** `listClients(scope)`/`getClientBySlug(scope,…)` (clients tem account_id, filtro
+  direto) + `accountClientIds(scope)`; `listAllCampaigns`/`listAnalyses`/`getLatestAnalysis`/
+  `listLandingPages`/`listOperationLogs` agora recebem `scope` e filtram por `client_id IN (clientes da
+  account)`. `super_admin`/`socio` = global; `cliente_usuario` = só os seus.
+- **Páginas + API:** `/`, `/analyses`, `/funnel`, `/landing-pages`, `/clients/:slug` passam o scope da
+  sessão; `GET /api/data/*` idem; `/clients/<outra account>` → notFound.
+- **Nexus/landing = agência-only (Onda 15):** `/api/nexus/*` e `/api/landing/*` exigem visibilidade
+  global (403 p/ cliente); widget do Nexus some no Shell; reads internos do Nexus usam `AGENCY_SCOPE`.
+- Gates: lint/typecheck(root+web)/test(302)/format + `cd web && next build` **verdes**.
+- ⚠️ **Não exercitado ao vivo** (sem deploy). Dívida (ADR 0031): filtro filho faz 2 idas ao banco —
+  denormalizar `account_id` se virar gargalo. Nexus segue não-multi-tenant (bloqueado, não escopado).
+
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —
   builder remoto batia em TLS x509 na rede do operador), `.dockerignore` p/ não copiar `node_modules`

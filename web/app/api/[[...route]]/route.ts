@@ -150,28 +150,53 @@ app.use('/data/*', async (c, next) => {
   await next();
 });
 
-app.get('/data/clients', async (c) => c.json({ clients: await listClients() }));
+// Onda 15 — toda leitura operacional é escopada por account (super_admin/socio veem tudo;
+// cliente_usuario só o seu). O middleware /data/* já garantiu a sessão; aqui derivamos o escopo.
+app.get('/data/clients', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ clients: await listClients(scopeFromClaims(claims)) });
+});
 
 app.get('/data/clients/:slug', async (c) => {
-  const slug = c.req.param('slug');
-  const client = await getClientBySlug(slug);
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const client = await getClientBySlug(scopeFromClaims(claims), c.req.param('slug'));
   if (!client) return c.json({ error: 'not_found' }, 404);
   return c.json({ client });
 });
 
-app.get('/data/campaigns', async (c) => c.json({ campaigns: await listAllCampaigns() }));
+app.get('/data/campaigns', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ campaigns: await listAllCampaigns(scopeFromClaims(claims)) });
+});
 
-app.get('/data/analyses', async (c) => c.json({ analyses: await listAnalyses() }));
+app.get('/data/analyses', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ analyses: await listAnalyses(scopeFromClaims(claims)) });
+});
 
 app.get('/data/funnel', async (c) => {
-  const latest = await getLatestAnalysis();
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const latest = await getLatestAnalysis(scopeFromClaims(claims));
   if (!latest) return c.json({ analysis: null, events: [] });
   return c.json({ analysis: latest, events: await listFunnelEvents(latest.id) });
 });
 
-app.get('/data/landing-pages', async (c) => c.json({ landingPages: await listLandingPages() }));
+app.get('/data/landing-pages', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ landingPages: await listLandingPages(scopeFromClaims(claims)) });
+});
 
-app.get('/data/logs', async (c) => c.json({ logs: await listOperationLogs() }));
+app.get('/data/logs', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ logs: await listOperationLogs(scopeFromClaims(claims)) });
+});
 
 // ── Onda 12 — multi-tenant: accounts, conexões Meta e chaves de API ────────────
 // Leituras projetam só colunas de DISPLAY (o cipher do token/chave NUNCA é selecionado). Escritas
@@ -263,8 +288,12 @@ app.post('/data/api-keys', async (c) => {
 });
 
 // ── Nexus (protected: auth → authz → rate limit → validation → logic) ──────────
+// Onda 15 — Nexus é ferramenta da AGÊNCIA (lê dados globais, enfileira jobs, cria campanhas): só
+// visibilidade global. cliente_usuario não acessa (o widget também some no Shell).
 app.use('/nexus/*', async (c, next) => {
-  if (!(await requireOperatorApi(c))) return c.json({ error: 'unauthorized' }, 401);
+  const claims = await apiClaims(c);
+  if (!isAuthenticated(claims)) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
   const rl = await limitNexus(serverEnv(), clientIp(c));
   if (!rl.success) return c.json({ error: 'too_many_requests' }, 429);
   await next();
@@ -345,8 +374,11 @@ app.post('/nexus/capture', async (c) => {
 app.get('/nexus/narrations', async (c) => c.json({ narrations: await listNarrations() }));
 
 // ── Landing editor + autonomous mode (protected) ───────────────────────────────
+// Onda 15 — edição de landing/modo autônomo é operação da AGÊNCIA: só visibilidade global.
 app.use('/landing/*', async (c, next) => {
-  if (!(await requireOperatorApi(c))) return c.json({ error: 'unauthorized' }, 401);
+  const claims = await apiClaims(c);
+  if (!isAuthenticated(claims)) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
   await next();
 });
 

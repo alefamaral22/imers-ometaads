@@ -1,4 +1,5 @@
 import { requireOperator } from '../../lib/auth/server';
+import { scopeFromClaims } from '../../lib/multitenant/scope';
 import { getLatestAnalysis, listFunnelEvents } from '../../lib/services/analyses';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
@@ -22,13 +23,13 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 export default async function FunnelPage() {
-  await requireOperator();
+  const scope = scopeFromClaims(await requireOperator());
 
   let error: string | null = null;
   let analysis: Awaited<ReturnType<typeof getLatestAnalysis>> = null;
   let events: Awaited<ReturnType<typeof listFunnelEvents>> = [];
   try {
-    analysis = await getLatestAnalysis();
+    analysis = await getLatestAnalysis(scope);
     if (analysis) events = await listFunnelEvents(analysis.id);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';

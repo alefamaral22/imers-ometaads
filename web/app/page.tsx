@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { requireOperator } from '../lib/auth/server';
+import { scopeFromClaims } from '../lib/multitenant/scope';
 import { listClients } from '../lib/services/clients';
 import { listAllCampaigns } from '../lib/services/campaigns';
 import { listAnalyses } from '../lib/services/analyses';
@@ -22,7 +23,7 @@ import { formatCents, formatDate } from '../lib/domain/format';
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
-  await requireOperator();
+  const scope = scopeFromClaims(await requireOperator());
 
   // The dashboard degrades gracefully when the DB is unreachable (e.g. unconfigured env in preview).
   let error: string | null = null;
@@ -32,10 +33,10 @@ export default async function OverviewPage() {
   let logs: Awaited<ReturnType<typeof listOperationLogs>> = [];
   try {
     [clients, campaigns, analyses, logs] = await Promise.all([
-      listClients(),
-      listAllCampaigns(50),
-      listAnalyses(1),
-      listOperationLogs(8),
+      listClients(scope),
+      listAllCampaigns(scope, 50),
+      listAnalyses(scope, 1),
+      listOperationLogs(scope, 8),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';

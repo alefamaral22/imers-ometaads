@@ -13,6 +13,11 @@ export interface AccountScope {
 // FRONTEIRA DE SEGURANÇA: incluir um papel aqui = ele passa a ver dados de TODOS os tenants.
 const GLOBAL_VISIBILITY: ReadonlySet<Role> = new Set<Role>(['super_admin', 'socio']);
 
+// Onda 15 — escopo de visibilidade global (a agência). Usado por superfícies JÁ restritas a
+// super_admin/socio (ex.: Nexus), onde as leituras são intencionalmente de toda a agência. O accountId
+// é irrelevante aqui: scopeEq curto-circuita em null para papéis globais.
+export const AGENCY_SCOPE: AccountScope = { role: 'super_admin', accountId: '' };
+
 /** Monta o escopo a partir das claims da sessão (ADR 0029). */
 export function scopeFromClaims(claims: { sub: string; role: Role }): AccountScope {
   return { role: claims.role, accountId: claims.sub };
@@ -32,4 +37,22 @@ export function scopeEq(scope: AccountScope): Record<string, string> | null {
 export function canManageAccount(scope: AccountScope, targetAccountId: string): boolean {
   if (GLOBAL_VISIBILITY.has(scope.role)) return true;
   return scope.accountId === targetAccountId;
+}
+
+// Onda 15 — tabelas "filhas" (campaigns/analyses/landing_pages/operation_logs) não têm account_id;
+// pertencem a um client_id, e cada cliente pertence a uma account. O escopo delas vem dos client_ids
+// da account. Esta decisão é pura/testável; o I/O (resolver os ids) fica no serviço.
+export type ClientScopeFilter =
+  | { kind: 'all' } // visibilidade global (super_admin/socio): sem filtro
+  | { kind: 'none' } // restrito e a account não tem clientes: resultado vazio, sem ir ao banco
+  | { kind: 'in'; clientIds: readonly string[] }; // restrito: filtra por client_id IN (...)
+
+/**
+ * A partir dos client_ids da account (ou null = global), decide como escopar uma tabela filha.
+ * `null` → 'all'; `[]` → 'none' (curto-circuito anti-vazamento: nunca vira "sem filtro"); senão 'in'.
+ */
+export function clientScopeFilter(clientIds: readonly string[] | null): ClientScopeFilter {
+  if (clientIds === null) return { kind: 'all' };
+  if (clientIds.length === 0) return { kind: 'none' };
+  return { kind: 'in', clientIds };
 }

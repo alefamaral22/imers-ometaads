@@ -7,9 +7,18 @@ import {
   type AnalysisRow,
   type FunnelEventRow,
 } from '../domain/schemas';
+import { clientScopeFilter, type AccountScope } from '../multitenant/scope';
+import { accountClientIds } from './clients';
 
-export async function listAnalyses(limit = 100): Promise<AnalysisRow[]> {
-  const rows = await selectRows('analyses', { order: 'created_at.desc', limit });
+/** Análises da agência escopadas por account (Onda 15). */
+export async function listAnalyses(scope: AccountScope, limit = 100): Promise<AnalysisRow[]> {
+  const filter = clientScopeFilter(await accountClientIds(scope));
+  if (filter.kind === 'none') return [];
+  const rows = await selectRows('analyses', {
+    order: 'created_at.desc',
+    limit,
+    ...(filter.kind === 'in' ? { in: { client_id: filter.clientIds } } : {}),
+  });
   return parseRows(analysisRowSchema, rows);
 }
 
@@ -22,8 +31,14 @@ export async function listAnalysesByClient(clientId: string, limit = 50): Promis
   return parseRows(analysisRowSchema, rows);
 }
 
-export async function getLatestAnalysis(): Promise<AnalysisRow | null> {
-  const rows = await selectRows('analyses', { order: 'created_at.desc', limit: 1 });
+export async function getLatestAnalysis(scope: AccountScope): Promise<AnalysisRow | null> {
+  const filter = clientScopeFilter(await accountClientIds(scope));
+  if (filter.kind === 'none') return null;
+  const rows = await selectRows('analyses', {
+    order: 'created_at.desc',
+    limit: 1,
+    ...(filter.kind === 'in' ? { in: { client_id: filter.clientIds } } : {}),
+  });
   return parseRows(analysisRowSchema, rows)[0] ?? null;
 }
 

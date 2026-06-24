@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { requireOperator } from '../../../lib/auth/server';
+import { scopeFromClaims } from '../../../lib/multitenant/scope';
 import { getClientBySlug } from '../../../lib/services/clients';
 import { listCampaignsByClient } from '../../../lib/services/campaigns';
 import { listAnalysesByClient } from '../../../lib/services/analyses';
@@ -22,10 +23,12 @@ import { formatCents, formatDate } from '../../../lib/domain/format';
 export const dynamic = 'force-dynamic';
 
 export default async function ClientPage({ params }: { params: Promise<{ slug: string }> }) {
-  await requireOperator();
+  const scope = scopeFromClaims(await requireOperator());
   const { slug } = await params;
 
-  const client = await getClientBySlug(slug).catch(() => null);
+  // Escopado: um cliente_usuario que tente abrir /clients/<outro> recebe notFound (não 403, p/ não
+  // confirmar a existência do recurso de outra account).
+  const client = await getClientBySlug(scope, slug).catch(() => null);
   if (!client) notFound();
 
   let error: string | null = null;

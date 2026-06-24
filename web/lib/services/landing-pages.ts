@@ -1,9 +1,21 @@
 import 'server-only';
 import { selectRows } from '../db/client';
 import { landingPageRowSchema, parseRows, type LandingPageRow } from '../domain/schemas';
+import { clientScopeFilter, type AccountScope } from '../multitenant/scope';
+import { accountClientIds } from './clients';
 
-export async function listLandingPages(limit = 200): Promise<LandingPageRow[]> {
-  const rows = await selectRows('landing_pages', { order: 'updated_at.desc', limit });
+/** Landing pages da agência escopadas por account (Onda 15). */
+export async function listLandingPages(
+  scope: AccountScope,
+  limit = 200,
+): Promise<LandingPageRow[]> {
+  const filter = clientScopeFilter(await accountClientIds(scope));
+  if (filter.kind === 'none') return [];
+  const rows = await selectRows('landing_pages', {
+    order: 'updated_at.desc',
+    limit,
+    ...(filter.kind === 'in' ? { in: { client_id: filter.clientIds } } : {}),
+  });
   return parseRows(landingPageRowSchema, rows);
 }
 

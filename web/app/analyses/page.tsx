@@ -1,4 +1,5 @@
 import { requireOperator } from '../../lib/auth/server';
+import { scopeFromClaims } from '../../lib/multitenant/scope';
 import { listAnalyses } from '../../lib/services/analyses';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
@@ -7,12 +8,12 @@ import { formatDate, formatInteger } from '../../lib/domain/format';
 export const dynamic = 'force-dynamic';
 
 export default async function AnalysesPage() {
-  await requireOperator();
+  const scope = scopeFromClaims(await requireOperator());
 
   let error: string | null = null;
   let analyses: Awaited<ReturnType<typeof listAnalyses>> = [];
   try {
-    analyses = await listAnalyses(100);
+    analyses = await listAnalyses(scope, 100);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
   }
