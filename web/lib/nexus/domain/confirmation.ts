@@ -46,7 +46,7 @@ export function buildPendingAction(
     skill: resolved.skill,
     kind: resolved.kind,
     args,
-    summary: `Confirmar: ${HUMAN[resolved.kind]} para ${target}?`,
+    summary: `Posso ${HUMAN[resolved.kind]} para ${target}?`,
   };
 }
 

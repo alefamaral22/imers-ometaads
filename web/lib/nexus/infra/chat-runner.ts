@@ -117,9 +117,10 @@ function proposeWrite(tool: AnthropicToolUseBlock, leadingText: string): ChatRes
   if (pending === null) {
     return { reply: 'Não reconheci essa ação (slug fora da allowlist). Nada foi feito.' };
   }
-  const reply = [leadingText, pending.summary].filter(Boolean).join(' ');
+  // A fala/chat é só o texto natural do modelo; a caixa de confirmação (summary + botões) cobre o
+  // "pode seguir?". Não colamos o resumo formal aqui para a conversa não soar robótica nem duplicada.
   return {
-    reply: reply || pending.summary,
+    reply: leadingText || pending.summary,
     pending: {
       id: pending.id,
       slug: pending.slug,
