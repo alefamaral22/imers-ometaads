@@ -28,7 +28,19 @@ describe('parseClaimedJob', () => {
       skill: 'create-traffic-cliente-exemplo-campaign',
       kind: 'create',
       args: {},
+      accountId: null,
     });
+  });
+
+  it('parses account_id when present (Onda 12 multi-tenant)', () => {
+    const job = parseClaimedJob({
+      id: '11111111-1111-1111-1111-111111111111',
+      skill: 'create-traffic-cliente-exemplo-campaign',
+      kind: 'create',
+      args: {},
+      account_id: '22222222-2222-2222-2222-222222222222',
+    });
+    expect(job?.accountId).toBe('22222222-2222-2222-2222-222222222222');
   });
 
   it('throws when required columns are missing', () => {

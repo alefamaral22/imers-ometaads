@@ -16,6 +16,63 @@ import {
   type RunnerConfig,
 } from './infrastructure/supabase.ts';
 import { listAvailableSkills } from './infrastructure/skills-fs.ts';
+import type { ClaimedJob } from './domain/job.ts';
+import { planTenantKeyEnv } from '../onda12/application/tenant-key-env.ts';
+import {
+  selectAccountRole,
+  selectAccountKeys,
+  decryptAccountKey,
+  readEncKeys,
+} from '../onda12/infrastructure/secrets-rest.ts';
+
+// Onda 12 — provedor → variável de ambiente que o subprocesso da skill lê.
+const PROVIDER_ENV: Record<string, string> = {
+  anthropic: 'ANTHROPIC_API_KEY', // o claude -p lê ANTHROPIC_API_KEY
+  openai: 'OPENAI_API_KEY',
+};
+const TENANT_PROVIDERS = ['anthropic', 'openai'];
+
+/**
+ * Resolve as chaves de API do tenant dono do job (ADR 0027). super_admin (conta-âncora da agência)
+ * preserva o caminho atual (OAuth/global) — NÃO injeta nada. Tenant pagante roda o subprocesso com as
+ * próprias chaves; sem chave própria utilizável, o job aborta cedo (ok:false). Erro ao ler a account
+ * degrada para "sem injeção" (nunca quebra a fila atual do super_admin).
+ */
+async function resolveTenantKeyEnv(
+  cfg: RunnerConfig,
+  job: ClaimedJob,
+): Promise<{ ok: true; overrides: Record<string, string> } | { ok: false; reason: string }> {
+  if (!job.accountId) return { ok: true, overrides: {} };
+
+  let role: string | null;
+  try {
+    role = await selectAccountRole(cfg, job.accountId);
+  } catch (err) {
+    process.stderr.write(
+      `tenant-keys: role lookup failed (${err instanceof Error ? err.message : String(err)})\n`,
+    );
+    return { ok: true, overrides: {} };
+  }
+  if (role === null || role === 'super_admin') return { ok: true, overrides: {} };
+
+  const keys = await selectAccountKeys(cfg, job.accountId);
+  const plan = planTenantKeyEnv({
+    role: role as 'socio' | 'cliente_usuario',
+    tenantKeys: keys.map((k) => ({ provider: k.provider, status: k.status })),
+    globalProviders: {}, // tenant pagante nunca usa a global → irrelevante para o abort
+    providers: TENANT_PROVIDERS,
+  });
+  if (!plan.ok) return { ok: false, reason: plan.reason };
+
+  const encKeys = readEncKeys();
+  const overrides: Record<string, string> = {};
+  for (const provider of plan.useTenant) {
+    const row = keys.find((k) => k.provider === provider);
+    const envName = PROVIDER_ENV[provider];
+    if (row && envName) overrides[envName] = decryptAccountKey(row, encKeys);
+  }
+  return { ok: true, overrides };
+}
 
 function emit(cfg: RunnerConfig, row: Parameters<typeof insertAgentEvent>[1]): Promise<void> {
   return insertAgentEvent(cfg, row).catch((err: unknown) => {
@@ -45,17 +102,29 @@ async function main(): Promise<void> {
     throw new Error(`rejected job ${job.id}: ${reason}`);
   }
 
+  // Onda 12 — chaves por tenant: resolve ANTES de rodar. Tenant pagante sem chave própria utilizável
+  // aborta o job aqui (não vaza gasto para a global). super_admin é no-op (caminho atual preservado).
+  const keyEnv = await resolveTenantKeyEnv(cfg, job);
+  if (!keyEnv.ok) {
+    await patchAgentJob(cfg, job.id, finishedPatch(1, new Date().toISOString(), keyEnv.reason));
+    await emit(cfg, endEvent(job.id, job.skill, 1));
+    process.stdout.write(`job ${job.id} -> failed (tenant key: ${keyEnv.reason})\n`);
+    return;
+  }
+
   await patchAgentJob(cfg, job.id, runningPatch(new Date().toISOString()));
   await emit(cfg, startEvent(job.id, job.skill));
 
   // Executa a skill via run-skill.sh (que faz claude -p stream-json | emit-from-stream).
   // AGENT_RUN_ID liga a telemetria do stream ao job; AGENT_ARGS passa os args já validados.
+  // keyEnv.overrides injeta as chaves do tenant (ou {} para super_admin) — nunca logadas.
   const result = spawnSync('bash', ['scripts/run-skill.sh', job.skill], {
     stdio: 'inherit',
     env: {
       ...process.env,
       AGENT_RUN_ID: job.id,
       AGENT_ARGS: JSON.stringify(safeArgs),
+      ...keyEnv.overrides,
     },
   });
   const exitCode = result.status ?? 1;

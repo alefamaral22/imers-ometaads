@@ -478,9 +478,22 @@ operação real; 6 precede 7; 8 precede 9 e 10.
   `parseKey`/`encryptSecret`/`decryptSecret` fail-closed/`last4`/bytea `\x` boundary) e `provider-key.ts`
   (`resolveProviderKey`: tenant nunca cai na global; fora do super_admin chave própria obrigatória).
   **19 testes** (248 no total). Gates verdes: lint/typecheck/test/format.
-- ⚠️ **Pendente (código, não feito):** infra REST p/ ler conexões/chaves + decifrar; skill
-  `validate-connections-tick`; ajuste runner (`run-skill.sh` injeta `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`
-  do tenant); serviços/telas do dashboard + acessador `withAccount`. Spec §9 tem o plano.
+- **Etapa 3 ✅ (commit nesta sessão):** infra + validação + injeção de chaves no runner.
+  - **Puros (testados):** `connection-health.ts` (`classifyMetaProbe`: ok/auth_error/transient — erro
+    transitório NÃO condena o token), `application/validate-plan.ts` (`planConnectionPatch`),
+    `application/tenant-key-env.ts` (`planTenantKeyEnv`). +15 testes (263 total).
+  - **Infra:** `infrastructure/secrets-rest.ts` (lê/patcha conexões/chaves via REST, `readEncKeys`
+    AD_TOKEN/API_KEY, decifra só server-side). **Orquestrador** `validate-connections.ts` (probe Graph
+    com token no header Bearer — nunca na URL/log; ADR 0028 caminho REST por tenant).
+  - **Skill** `.claude/skills/validate-connections-tick/` + **cron** 08:00 UTC (TS direto, sem claude -p).
+  - **Runner:** `poll-once.ts` resolve chaves do tenant antes de rodar (gated: **super_admin = no-op**,
+    caminho atual OAuth/global preservado; tenant pagante sem chave própria → job aborta cedo).
+    `ClaimedJob.accountId` parseado. Envs novas em `types/env.d.ts` (AD_TOKEN_ENC_KEY/API_KEY_ENC_KEY).
+  - ⚠️ **Não exercitado ao vivo:** sem conexões/tenants reais nem `*_ENC_KEY` setadas; lógica de decisão
+    100% testada. Para o runner aplicar, falta `fly secrets set AD_TOKEN_ENC_KEY/API_KEY_ENC_KEY` +
+    redeploy (dormant até existir tenant não-super_admin). `.env.example` ainda não espelha as 2 chaves.
+- ⚠️ **Pendente (etapa 4):** serviços/telas do dashboard (conexões/chaves, só `last4`) + acessador
+  `withAccount`. Spec §9.
 
 ### Go-live — produção (2026-06-22/23) 🔄 em andamento
 - **Runner Fly** `imers-ometaads` (gru) **no ar 24/7**: build local (`flyctl deploy --local-only` —

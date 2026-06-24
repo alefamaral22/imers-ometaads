@@ -10,6 +10,9 @@ export interface ClaimedJob {
   skill: string;
   kind: string;
   args: Record<string, unknown>;
+  // Onda 12 — tenant dono do job (denormalizado no enqueue). Opcional: jobs antigos/sem cliente podem
+  // não ter. O runner usa para resolver as chaves do tenant antes de executar a skill.
+  accountId: string | null;
 }
 
 /** Faz o parse da linha retornada por claim_agent_job (ou null quando não há job pendente). */
@@ -29,6 +32,7 @@ export function parseClaimedJob(value: unknown): ClaimedJob | null {
       args && typeof args === 'object' && !Array.isArray(args)
         ? (args as Record<string, unknown>)
         : {},
+    accountId: typeof obj.account_id === 'string' && obj.account_id !== '' ? obj.account_id : null,
   };
 }
 

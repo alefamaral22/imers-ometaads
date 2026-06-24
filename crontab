@@ -7,6 +7,10 @@
 # Onda 9 — Modo autônomo: avança 1 tick de um watch ativo por minuto (lock + claim atômico).
 * * * * * bash /app/scripts/poll-autonomous-watches.sh >> /app/logs/watch.log 2>&1
 
+# Onda 12 — Valida os tokens Meta manuais das conexões vivas (1×/dia, SPEC §5.4). TS determinístico,
+# sem claude -p. Antes da skill de tráfego para pegar um token revogado cedo. Precisa AD_TOKEN_ENC_KEY.
+0 8 * * * cd /app && npx tsx scripts/onda12/validate-connections.ts >> /app/logs/cron.log 2>&1
+
 # Skill de tráfego agendada — aceite da Onda 3: "cron dispara a skill da Onda 2". Diária às 09:00 UTC.
 0 9 * * * bash /app/scripts/run-skill.sh create-traffic-cliente-exemplo-campaign >> /app/logs/cron.log 2>&1
 

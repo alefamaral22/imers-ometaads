@@ -16,6 +16,13 @@ declare namespace NodeJS {
     readonly NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?: string;
     readonly DATABASE_URL?: string;
 
+    // Onda 12 — cripto dos segredos por tenant (AES-256-GCM app-level; 32 bytes hex/base64; chave
+    // NUNCA no banco). Separadas por tipo de segredo (ADR 0027).
+    readonly AD_TOKEN_ENC_KEY?: string; // cifra os tokens Meta em ad_account_connections
+    readonly API_KEY_ENC_KEY?: string; // cifra as keys de provedor em api_keys_clientes
+    // Chave de provedor injetada por tenant no subprocesso da skill (resolvida pelo runner).
+    readonly ANTHROPIC_API_KEY?: string;
+
     // Upstash Redis
     readonly UPSTASH_REDIS_REST_URL?: string;
     readonly UPSTASH_REDIS_REST_TOKEN?: string;
