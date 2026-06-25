@@ -103,16 +103,14 @@ export default async function ClientPage({ params }: { params: Promise<{ slug: s
         <Card>
           <CardTitle>Análises recentes</CardTitle>
           {analyses.length === 0 ? (
-            <p className="text-sm text-neutral-400">Nenhuma análise.</p>
+            <p className="text-sm text-dim">Nenhuma análise.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {analyses.map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-3">
                   <Badge value={a.overall_verdict} />
-                  <span className="truncate text-neutral-300">
-                    {a.summary ?? a.objective ?? '—'}
-                  </span>
-                  <span className="shrink-0 text-neutral-500">{formatDate(a.created_at)}</span>
+                  <span className="truncate text-ink/80">{a.summary ?? a.objective ?? '—'}</span>
+                  <span className="shrink-0 text-dim">{formatDate(a.created_at)}</span>
                 </li>
               ))}
             </ul>
@@ -122,15 +120,15 @@ export default async function ClientPage({ params }: { params: Promise<{ slug: s
         <Card>
           <CardTitle>Operações</CardTitle>
           {logs.length === 0 ? (
-            <p className="text-sm text-neutral-400">Sem operações.</p>
+            <p className="text-sm text-dim">Sem operações.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {logs.map((log) => (
                 <li key={log.id} className="flex items-center justify-between gap-3">
-                  <span className="truncate text-neutral-300">
-                    <span className="text-neutral-500">{log.action}</span> {log.entity_type}
+                  <span className="truncate text-ink/80">
+                    <span className="text-dim">{log.action}</span> {log.entity_type}
                   </span>
-                  <span className="shrink-0 text-neutral-500">{formatDate(log.created_at)}</span>
+                  <span className="shrink-0 text-dim">{formatDate(log.created_at)}</span>
                 </li>
               ))}
             </ul>

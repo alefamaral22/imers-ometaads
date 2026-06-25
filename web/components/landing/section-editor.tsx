@@ -69,11 +69,11 @@ export function SectionEditor({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-neutral-400">{status || 'Edite um campo e salve.'}</p>
+        <p className="text-sm text-dim">{status || 'Edite um campo e salve.'}</p>
         <button
           type="button"
           onClick={startAutonomous}
-          className="rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-neutral-50 hover:bg-sky-500"
+          className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-ink hover:bg-accent/80"
         >
           Modo autônomo
         </button>
@@ -96,14 +96,14 @@ function SectionCard({
   const [value, setValue] = useState('');
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+    <div className="rounded-xl border border-edge/60 bg-panel/70 p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-neutral-100">
-          {section.type} <span className="text-neutral-500">· v{section.version}</span>
+        <span className="text-sm font-medium text-ink">
+          {section.type} <span className="text-dim">· v{section.version}</span>
         </span>
-        <span className="text-xs text-neutral-500">posição {section.position}</span>
+        <span className="text-xs text-dim">posição {section.position}</span>
       </div>
-      <pre className="mb-3 max-h-32 overflow-auto rounded-md bg-neutral-950 p-2 text-xs text-neutral-400">
+      <pre className="mb-3 max-h-32 overflow-auto rounded-md bg-bg/60 p-2 text-xs text-dim">
         {JSON.stringify(section.fields ?? {}, null, 2)}
       </pre>
       <form
@@ -117,17 +117,17 @@ function SectionCard({
           value={path}
           onChange={(e) => setPath(e.target.value)}
           placeholder="campo (ex.: cta.label)"
-          className="w-40 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-100"
+          className="w-40 rounded-md border border-edge/70 bg-bg/60 px-2 py-1 text-xs text-ink"
         />
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="novo valor"
-          className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-100"
+          className="flex-1 rounded-md border border-edge/70 bg-bg/60 px-2 py-1 text-xs text-ink"
         />
         <button
           type="submit"
-          className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-semibold text-neutral-950 hover:bg-emerald-400"
+          className="rounded-md bg-pos px-3 py-1 text-xs font-semibold text-bg hover:bg-pos/80"
         >
           Salvar
         </button>

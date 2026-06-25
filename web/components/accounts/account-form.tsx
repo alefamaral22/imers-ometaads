@@ -11,7 +11,7 @@ const ERRORS: Record<string, string> = {
 };
 
 const input =
-  'mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-sky-500';
+  'mt-1 w-full rounded-md border border-edge/70 bg-bg/60 px-3 py-2 text-sm outline-none focus:border-accent';
 
 const ROLES = [
   { value: 'cliente_usuario', label: 'Cliente' },
@@ -68,10 +68,10 @@ export function AccountForm() {
   return (
     <form
       onSubmit={onSubmit}
-      className="mb-4 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 sm:grid-cols-2"
+      className="mb-4 grid gap-3 rounded-xl border border-edge/60 bg-panel/40 p-4 sm:grid-cols-2"
     >
       <div>
-        <label className="block text-xs text-neutral-400">Slug</label>
+        <label className="block text-xs text-dim">Slug</label>
         <input
           value={slug}
           onChange={(e) => setSlug(e.target.value.toLowerCase())}
@@ -81,7 +81,7 @@ export function AccountForm() {
         />
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Nome</label>
+        <label className="block text-xs text-dim">Nome</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -91,7 +91,7 @@ export function AccountForm() {
         />
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Papel</label>
+        <label className="block text-xs text-dim">Papel</label>
         <select value={role} onChange={(e) => setRole(e.target.value)} className={input}>
           {ROLES.map((r) => (
             <option key={r.value} value={r.value}>
@@ -101,7 +101,7 @@ export function AccountForm() {
         </select>
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Plano</label>
+        <label className="block text-xs text-dim">Plano</label>
         <select value={plan} onChange={(e) => setPlan(e.target.value)} className={input}>
           {PLANS.map((p) => (
             <option key={p} value={p}>
@@ -111,7 +111,7 @@ export function AccountForm() {
         </select>
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">E-mail de login</label>
+        <label className="block text-xs text-dim">E-mail de login</label>
         <input
           type="email"
           value={email}
@@ -123,7 +123,7 @@ export function AccountForm() {
         />
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Senha inicial (mín. 8)</label>
+        <label className="block text-xs text-dim">Senha inicial (mín. 8)</label>
         <input
           type="password"
           value={password}
@@ -134,12 +134,12 @@ export function AccountForm() {
         />
       </div>
       <div className="sm:col-span-2">
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        {okMsg ? <p className="text-sm text-emerald-400">{okMsg}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {okMsg ? <p className="text-sm text-pos">{okMsg}</p> : null}
         <button
           type="submit"
           disabled={pending || slug.length < 2 || password.length < 8 || email.length === 0}
-          className="mt-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="mt-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-bg hover:bg-accent/80 disabled:opacity-50"
         >
           {pending ? 'Criando…' : 'Criar conta'}
         </button>

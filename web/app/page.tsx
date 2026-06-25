@@ -54,12 +54,36 @@ export default async function OverviewPage() {
 
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
 
+      {/* Hero "Neural Core" — copiloto de voz com arc reactor (espelha o painel do Jarvis). */}
+      <Card className="mb-6 overflow-hidden">
+        <span
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px scan-top bg-gradient-to-r from-transparent via-accent to-transparent"
+        />
+        <div className="flex items-center justify-between gap-6">
+          <div>
+            <p className="text-[10px] tracking-[0.3em] text-dim uppercase">
+              I.A. Copiloto · Neural Core
+            </p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[0.12em] text-ink uppercase">
+              Ativar <span className="text-accent text-glow">Nexus</span>
+            </h2>
+            <p className="mt-2 max-w-md text-xs leading-relaxed text-dim">
+              Copiloto de voz com IA para operar campanhas em tempo real. Fale ou digite para
+              analisar, criar, pausar e ajustar orçamentos — abra o Nexus no canto inferior direito.
+            </p>
+          </div>
+          <span aria-hidden className="reactor h-24 w-24 shrink-0" />
+        </div>
+      </Card>
+
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Stat label="Clientes" value={clients.length} />
-        <Stat label="Campanhas" value={campaigns.length} />
-        <Stat label="Pausadas" value={pausedCount} />
+        <Stat label="Clientes" value={clients.length} tone="accent2" />
+        <Stat label="Campanhas" value={campaigns.length} tone="accent" />
+        <Stat label="Pausadas" value={pausedCount} tone="warn" />
         <Stat
           label="Último veredito"
+          tone="pos"
           value={latestVerdict ? <Badge value={latestVerdict} /> : '—'}
         />
       </div>
@@ -100,15 +124,18 @@ export default async function OverviewPage() {
         <Card>
           <CardTitle>Clientes</CardTitle>
           {clients.length === 0 ? (
-            <p className="text-sm text-neutral-400">Nenhum cliente.</p>
+            <p className="text-sm text-dim">Nenhum cliente.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {clients.map((cl) => (
                 <li key={cl.id} className="flex items-center justify-between">
-                  <Link href={`/clients/${cl.slug}`} className="text-sky-300 hover:underline">
+                  <Link
+                    href={`/clients/${cl.slug}`}
+                    className="text-accent transition-colors hover:text-glow hover:underline"
+                  >
                     {cl.name}
                   </Link>
-                  <span className="text-neutral-500">
+                  <span className="text-dim">
                     teto {formatCents(cl.daily_budget_cap_cents, cl.currency)}
                   </span>
                 </li>
@@ -120,16 +147,16 @@ export default async function OverviewPage() {
         <Card>
           <CardTitle>Atividade recente</CardTitle>
           {logs.length === 0 ? (
-            <p className="text-sm text-neutral-400">Sem operações registradas.</p>
+            <p className="text-sm text-dim">Sem operações registradas.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {logs.map((log) => (
                 <li key={log.id} className="flex items-center justify-between gap-3">
-                  <span className="truncate text-neutral-300">
-                    <span className="text-neutral-500">{log.action}</span> {log.entity_type}
+                  <span className="truncate text-ink/80">
+                    <span className="text-accent/70">{log.action}</span> {log.entity_type}
                     {log.summary ? ` — ${log.summary}` : ''}
                   </span>
-                  <span className="shrink-0 text-neutral-500">{formatDate(log.created_at)}</span>
+                  <span className="shrink-0 text-dim">{formatDate(log.created_at)}</span>
                 </li>
               ))}
             </ul>

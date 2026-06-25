@@ -12,7 +12,7 @@ const ERRORS: Record<string, string> = {
 const PROVIDERS = ['anthropic', 'openai', 'elevenlabs', 'minimax', 'other'] as const;
 
 const input =
-  'mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-sky-500';
+  'mt-1 w-full rounded-md border border-edge/70 bg-bg/60 px-3 py-2 text-sm outline-none focus:border-accent';
 
 export function ApiKeyForm({
   accounts,
@@ -64,10 +64,10 @@ export function ApiKeyForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="mb-4 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 sm:grid-cols-2"
+      className="mb-4 grid gap-3 rounded-xl border border-edge/60 bg-panel/40 p-4 sm:grid-cols-2"
     >
       <div>
-        <label className="block text-xs text-neutral-400">Conta</label>
+        <label className="block text-xs text-dim">Conta</label>
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value)}
@@ -82,7 +82,7 @@ export function ApiKeyForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Provedor</label>
+        <label className="block text-xs text-dim">Provedor</label>
         <select
           value={provider}
           onChange={(e) => setProvider(e.target.value as (typeof PROVIDERS)[number])}
@@ -97,7 +97,7 @@ export function ApiKeyForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Chave</label>
+        <label className="block text-xs text-dim">Chave</label>
         <input
           type="password"
           value={key}
@@ -109,7 +109,7 @@ export function ApiKeyForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Rótulo (opcional)</label>
+        <label className="block text-xs text-dim">Rótulo (opcional)</label>
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -118,12 +118,12 @@ export function ApiKeyForm({
         />
       </div>
       <div className="sm:col-span-2">
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        {okMsg ? <p className="text-sm text-emerald-400">{okMsg}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {okMsg ? <p className="text-sm text-pos">{okMsg}</p> : null}
         <button
           type="submit"
           disabled={disabled || pending || key.length < 10}
-          className="mt-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="mt-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-bg hover:bg-accent/80 disabled:opacity-50"
         >
           {pending ? 'Salvando…' : 'Salvar chave'}
         </button>

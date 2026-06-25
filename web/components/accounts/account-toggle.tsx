@@ -40,8 +40,8 @@ export function AccountToggle({ id, isActive }: { id: string; isActive: boolean 
       disabled={pending}
       className={`rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
         isActive
-          ? 'bg-red-500/15 text-red-300 hover:bg-red-500/25'
-          : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25'
+          ? 'bg-danger/15 text-danger hover:bg-danger/25'
+          : 'bg-pos/15 text-pos hover:bg-pos/25'
       }`}
       title={error ? 'Falhou — tente novamente' : undefined}
     >

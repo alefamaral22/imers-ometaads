@@ -45,7 +45,7 @@ export default async function LandingPagesPage() {
               <tr key={p.id}>
                 <Td>
                   {p.url ? (
-                    <a href={p.url} className="text-sky-300 hover:underline">
+                    <a href={p.url} className="text-accent hover:underline">
                       {p.subdomain}
                     </a>
                   ) : (

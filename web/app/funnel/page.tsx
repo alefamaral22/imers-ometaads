@@ -45,7 +45,7 @@ export default async function FunnelPage() {
       {!error && !analysis ? <EmptyState>Nenhuma análise com funil ainda.</EmptyState> : null}
 
       {analysis ? (
-        <div className="mb-6 flex items-center gap-3 text-sm text-neutral-400">
+        <div className="mb-6 flex items-center gap-3 text-sm text-dim">
           <Badge value={analysis.overall_verdict} />
           <span>{analysis.objective ?? 'objetivo —'}</span>
           <span>·</span>

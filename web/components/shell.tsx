@@ -29,30 +29,41 @@ export async function Shell({ children }: { children: ReactNode }) {
   const isAgency = session?.role === 'super_admin' || session?.role === 'socio';
   const nav = isAgency ? [...NAV, ACCOUNTS_NAV] : NAV;
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <nav className="border-b border-neutral-800 bg-neutral-900/60">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+    <div className="relative z-10 min-h-screen">
+      <nav className="sticky top-0 z-20 border-b border-edge/60 bg-bg/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-6">
-            <Link href="/" className="text-sm font-semibold tracking-tight text-neutral-50">
-              Acme · Nexus
+            <Link href="/" className="group flex items-center gap-2.5">
+              <span aria-hidden className="reactor h-6 w-6 shrink-0" />
+              <span className="flex flex-col leading-none">
+                <span className="text-[8px] tracking-[0.32em] text-dim uppercase">
+                  Neural · Core · System
+                </span>
+                <span className="mt-0.5 text-sm font-bold tracking-[0.18em] text-ink uppercase">
+                  Acme <span className="text-accent text-glow">· Nexus</span>
+                </span>
+              </span>
             </Link>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
               {nav.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="text-sm text-neutral-400 hover:text-neutral-100"
+                  className="flex items-center gap-1 text-[11px] tracking-[0.12em] text-dim uppercase transition-colors hover:text-accent"
                 >
+                  <span aria-hidden className="text-accent/40">
+                    ▸
+                  </span>
                   {item.label}
                 </Link>
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {session ? (
-              <span className="text-xs text-neutral-400">
-                {session.slug}
-                <span className="ml-1 rounded bg-neutral-800 px-1.5 py-0.5 text-neutral-300">
+              <span className="flex items-center gap-1.5 text-[10px] tracking-wider uppercase">
+                <span className="text-dim">{session.slug}</span>
+                <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-accent">
                   {ROLE_LABEL[session.role] ?? session.role}
                 </span>
               </span>
@@ -61,7 +72,7 @@ export async function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </nav>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
       {isAgency ? <NexusWidget /> : null}
     </div>
   );

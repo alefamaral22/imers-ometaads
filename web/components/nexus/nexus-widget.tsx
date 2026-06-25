@@ -260,18 +260,22 @@ export function NexusWidget() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-6 bottom-6 z-50 rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-neutral-950 shadow-lg hover:bg-emerald-400"
+        className="group fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-full border border-accent/40 bg-panel/90 px-5 py-3 text-[11px] font-semibold tracking-[0.18em] text-accent uppercase shadow-[0_0_30px_-6px_rgba(56,230,255,0.6)] backdrop-blur transition-colors hover:bg-accent/10"
       >
+        <span aria-hidden className="reactor h-4 w-4" />
         Nexus
       </button>
     );
   }
 
   return (
-    <div className="fixed right-6 bottom-6 z-50 flex h-[28rem] w-80 flex-col rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl">
-      <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
+    <div className="fixed right-6 bottom-6 z-50 flex h-[28rem] w-80 flex-col rounded-xl border border-accent/25 bg-panel/95 shadow-[0_0_50px_-12px_rgba(56,230,255,0.5)] backdrop-blur-md">
+      <header className="flex items-center justify-between border-b border-edge/60 px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-neutral-100">Nexus</span>
+          <span aria-hidden className="reactor h-4 w-4" />
+          <span className="text-xs font-bold tracking-[0.2em] text-ink uppercase">
+            Ne<span className="text-accent text-glow">xus</span>
+          </span>
           <Visualizer active={voice.recording || voice.listening || voice.speaking || loading} />
         </div>
         <div className="flex items-center gap-2">
@@ -280,7 +284,7 @@ export function NexusWidget() {
             onChange={(e) => setTtsVoice(e.target.value)}
             aria-label="Voz do Nexus (MiniMax)"
             title="Voz do Nexus (aplica ao provedor MiniMax)"
-            className="max-w-[8rem] rounded-md border border-neutral-700 bg-neutral-800 px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-emerald-500"
+            className="max-w-[8rem] rounded-md border border-edge/70 bg-bg/60 px-1.5 py-1 text-[11px] text-dim outline-none focus:border-accent"
           >
             {MINIMAX_PT_VOICES.map((v) => (
               <option key={v.id} value={v.id}>
@@ -291,7 +295,7 @@ export function NexusWidget() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-neutral-400 hover:text-neutral-100"
+            className="text-dim transition-colors hover:text-accent"
           >
             ×
           </button>
@@ -299,15 +303,15 @@ export function NexusWidget() {
       </header>
 
       {voice.supported ? (
-        <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
+        <div className="flex items-center justify-between border-b border-edge/60 px-4 py-2">
           <button
             type="button"
             onClick={toggleHandsFree}
             aria-pressed={voice.handsFree}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-wider uppercase transition-colors ${
               voice.handsFree
-                ? 'bg-emerald-500 text-neutral-950 hover:bg-emerald-400'
-                : 'bg-neutral-800 text-neutral-200 hover:bg-neutral-700'
+                ? 'border-accent/50 bg-accent/15 text-accent'
+                : 'border-edge/70 text-dim hover:border-accent/40 hover:text-accent'
             }`}
           >
             <span aria-hidden>{voice.handsFree ? '🟢' : '🎙️'}</span>
@@ -315,7 +319,7 @@ export function NexusWidget() {
           </button>
           {voice.handsFree ? (
             <span
-              className={`text-xs ${voice.listening ? 'text-emerald-300' : 'text-neutral-400'}`}
+              className={`text-[10px] tracking-wider uppercase ${voice.listening ? 'text-accent' : 'text-dim'}`}
               aria-live="polite"
             >
               {hfStatus}
@@ -326,18 +330,18 @@ export function NexusWidget() {
 
       <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3 text-sm">
         {messages.length === 0 ? (
-          <p className="text-neutral-500">
-            Pergunte algo (ex.: “analisar cliente-exemplo”). Ligue o modo mãos-livres para conversar
-            por voz sem apertar nada.
+          <p className="text-dim">
+            Pergunte algo (ex.: “como estão minhas campanhas agora?”). Ligue o modo mãos-livres para
+            conversar por voz sem apertar nada.
           </p>
         ) : (
           messages.map((m, i) => (
             <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
               <span
-                className={`inline-block rounded-lg px-3 py-1.5 ${
+                className={`inline-block rounded-lg border px-3 py-1.5 ${
                   m.role === 'user'
-                    ? 'bg-emerald-500/20 text-emerald-100'
-                    : 'bg-neutral-800 text-neutral-200'
+                    ? 'border-accent/30 bg-accent/10 text-accent'
+                    : 'border-edge/50 bg-bg/50 text-ink/90'
                 }`}
               >
                 {m.text}
@@ -348,20 +352,20 @@ export function NexusWidget() {
       </div>
 
       {pending ? (
-        <div className="border-t border-amber-700/40 bg-amber-500/10 px-4 py-2">
-          <p className="mb-2 text-xs text-amber-200">{pending.summary}</p>
+        <div className="border-t border-warn/30 bg-warn/5 px-4 py-2">
+          <p className="mb-2 text-xs text-warn">{pending.summary}</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={confirm}
-              className="rounded-md bg-amber-500 px-3 py-1 text-xs font-semibold text-neutral-950 hover:bg-amber-400"
+              className="rounded-md border border-warn/50 bg-warn/15 px-3 py-1 text-[11px] font-semibold tracking-wider text-warn uppercase transition-colors hover:bg-warn/25"
             >
               Confirmar
             </button>
             <button
               type="button"
               onClick={cancel}
-              className="rounded-md bg-neutral-700 px-3 py-1 text-xs text-neutral-100 hover:bg-neutral-600"
+              className="rounded-md border border-edge/70 px-3 py-1 text-[11px] tracking-wider text-dim uppercase transition-colors hover:text-ink"
             >
               Cancelar
             </button>
@@ -374,14 +378,16 @@ export function NexusWidget() {
           e.preventDefault();
           void send(input);
         }}
-        className="flex items-center gap-2 border-t border-neutral-800 px-3 py-2"
+        className="flex items-center gap-2 border-t border-edge/60 px-3 py-2"
       >
         {voice.supported && !voice.handsFree ? (
           <button
             type="button"
             onClick={toggleMic}
-            className={`rounded-md px-2 py-1.5 text-xs ${
-              voice.recording ? 'bg-red-500 text-neutral-950' : 'bg-neutral-700 text-neutral-100'
+            className={`rounded-md border px-2 py-1.5 text-xs ${
+              voice.recording
+                ? 'border-danger/50 bg-danger/15 text-danger'
+                : 'border-edge/70 text-dim hover:border-accent/40 hover:text-accent'
             }`}
             aria-label={voice.recording ? 'Parar gravação' : 'Falar'}
           >
@@ -392,12 +398,12 @@ export function NexusWidget() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Mensagem…"
-          className="flex-1 rounded-md border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-100 outline-none focus:border-emerald-500"
+          className="flex-1 rounded-md border border-edge/70 bg-bg/60 px-3 py-1.5 text-sm text-ink outline-none placeholder:text-dim/60 focus:border-accent"
         />
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-neutral-950 hover:bg-emerald-400 disabled:opacity-50"
+          className="rounded-md border border-accent/50 bg-accent/15 px-3 py-1.5 text-[11px] font-semibold tracking-wider text-accent uppercase transition-colors hover:bg-accent/25 disabled:opacity-50"
         >
           Enviar
         </button>

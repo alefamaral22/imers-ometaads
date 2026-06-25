@@ -8,7 +8,7 @@ export function Visualizer({ active }: { active: boolean }) {
       {bars.map((i) => (
         <span
           key={i}
-          className={`w-1 rounded-full bg-emerald-400 transition-all ${active ? 'animate-pulse' : ''}`}
+          className={`w-1 rounded-full bg-accent transition-all ${active ? 'animate-pulse text-glow' : 'opacity-50'}`}
           style={{ height: active ? `${6 + ((i * 7) % 12)}px` : '4px' }}
         />
       ))}

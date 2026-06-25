@@ -1,9 +1,138 @@
 @import 'tailwindcss';
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Design system "Neural Core" — premium dark cyan. Tokens via @theme (Tailwind
+   v4): geram utilitários (bg-bg, text-accent, border-edge, font-mono, …).
+   Fonte mono do sistema (font-src 'self' na CSP — sem fontes externas).
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  --color-bg: #04070f;
+  --color-panel: #0a1322;
+  --color-panel-2: #0c1c30;
+  --color-edge: #173a55;
+  --color-accent: #38e6ff;
+  --color-accent-2: #2a9fff;
+  --color-pos: #00e5a0;
+  --color-warn: #ffb547;
+  --color-purple: #9d7bff;
+  --color-danger: #ff4d6d;
+  --color-ink: #d8f0fa;
+  --color-dim: #5b89a8;
+
+  --font-mono:
+    ui-monospace, 'JetBrains Mono', 'Cascadia Code', 'Segoe UI Mono', 'Roboto Mono', Consolas,
+    monospace;
+}
+
 :root {
   color-scheme: dark;
 }
 
 body {
-  @apply bg-neutral-950 text-neutral-100 antialiased;
+  @apply bg-bg text-ink antialiased;
+  font-family: var(--font-mono);
+}
+
+/* Grade neural + scanlines, fixas atrás do conteúdo (o conteúdo sobe com z-10). */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  background-image:
+    linear-gradient(to right, rgba(56, 230, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 230, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% -10%, #000 35%, transparent 80%);
+  mask-image: radial-gradient(ellipse at 50% -10%, #000 35%, transparent 80%);
+}
+body::after {
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  opacity: 0.3;
+}
+
+/* Scrollbar ciano. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 230, 255, 0.3) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(56, 230, 255, 0.25);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 230, 255, 0.45);
+}
+
+@layer utilities {
+  /* Brilho de texto neon (usa a própria cor do elemento). */
+  .text-glow {
+    text-shadow: 0 0 14px currentColor;
+  }
+  /* Painel com leve halo + sombra de profundidade. */
+  .panel-glow {
+    box-shadow:
+      inset 0 1px 0 rgba(56, 230, 255, 0.05),
+      0 18px 50px -22px rgba(0, 0, 0, 0.85);
+  }
+  /* Linha de varredura de destaque no topo de um card. */
+  .scan-top {
+    background-image: linear-gradient(90deg, transparent, rgba(56, 230, 255, 0.5), transparent);
+  }
+}
+
+/* ── Arc reactor (card do Nexus / hero) ─────────────────────────────────────
+   Núcleo radial + dois anéis girando em sentidos opostos. Reutilizável. */
+.reactor {
+  position: relative;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgba(56, 230, 255, 0.95) 0%,
+    rgba(56, 230, 255, 0.18) 32%,
+    transparent 62%
+  );
+  box-shadow:
+    0 0 30px rgba(56, 230, 255, 0.5),
+    inset 0 0 18px rgba(56, 230, 255, 0.35);
+}
+.reactor::before,
+.reactor::after {
+  content: '';
+  position: absolute;
+  border-radius: 9999px;
+  border: 1.5px solid transparent;
+}
+.reactor::before {
+  inset: 6%;
+  border-top-color: var(--color-accent);
+  border-right-color: rgba(56, 230, 255, 0.35);
+  animation: reactor-spin 4s linear infinite;
+}
+.reactor::after {
+  inset: 26%;
+  border-bottom-color: var(--color-accent);
+  border-left-color: rgba(56, 230, 255, 0.35);
+  animation: reactor-spin 2.4s linear infinite reverse;
+}
+@keyframes reactor-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respeita quem prefere menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .reactor::before,
+  .reactor::after {
+    animation: none;
+  }
 }

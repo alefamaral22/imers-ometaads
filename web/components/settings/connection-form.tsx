@@ -10,7 +10,7 @@ const ERRORS: Record<string, string> = {
 };
 
 const input =
-  'mt-1 w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm outline-none focus:border-sky-500';
+  'mt-1 w-full rounded-md border border-edge/70 bg-bg/60 px-3 py-2 text-sm outline-none focus:border-accent';
 
 export function ConnectionForm({
   accounts,
@@ -68,10 +68,10 @@ export function ConnectionForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="mb-4 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 sm:grid-cols-2"
+      className="mb-4 grid gap-3 rounded-xl border border-edge/60 bg-panel/40 p-4 sm:grid-cols-2"
     >
       <div>
-        <label className="block text-xs text-neutral-400">Conta</label>
+        <label className="block text-xs text-dim">Conta</label>
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value)}
@@ -86,7 +86,7 @@ export function ConnectionForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Conta de anúncio (act_…)</label>
+        <label className="block text-xs text-dim">Conta de anúncio (act_…)</label>
         <input
           value={metaAdAccountId}
           onChange={(e) => setMetaAdAccountId(e.target.value)}
@@ -97,7 +97,7 @@ export function ConnectionForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">System User token</label>
+        <label className="block text-xs text-dim">System User token</label>
         <input
           type="password"
           value={token}
@@ -109,7 +109,7 @@ export function ConnectionForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-neutral-400">Rótulo (opcional)</label>
+        <label className="block text-xs text-dim">Rótulo (opcional)</label>
         <input
           value={tokenLabel}
           onChange={(e) => setTokenLabel(e.target.value)}
@@ -119,12 +119,12 @@ export function ConnectionForm({
         />
       </div>
       <div className="sm:col-span-2">
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-        {okMsg ? <p className="text-sm text-emerald-400">{okMsg}</p> : null}
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {okMsg ? <p className="text-sm text-pos">{okMsg}</p> : null}
         <button
           type="submit"
           disabled={disabled || pending || token.length < 20 || metaAdAccountId.length === 0}
-          className="mt-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          className="mt-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-bg hover:bg-accent/80 disabled:opacity-50"
         >
           {pending ? 'Salvando…' : 'Conectar conta Meta'}
         </button>

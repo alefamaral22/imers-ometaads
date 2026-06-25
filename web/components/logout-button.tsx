@@ -24,7 +24,7 @@ export function LogoutButton() {
       type="button"
       onClick={logout}
       disabled={pending}
-      className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+      className="rounded-md border border-edge/70 px-3 py-1.5 text-[11px] tracking-wider text-dim uppercase transition-colors hover:border-danger/50 hover:text-danger disabled:opacity-50"
     >
       {pending ? 'Saindo…' : 'Sair'}
     </button>

@@ -51,7 +51,7 @@ export default async function SettingsPage() {
       ) : null}
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold text-neutral-300">Conexões Meta</h2>
+      <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Conexões Meta</h2>
       {accountList.length > 0 ? (
         <ConnectionForm accounts={accountList} disabled={!vaultOn} />
       ) : null}
@@ -87,7 +87,7 @@ export default async function SettingsPage() {
         </Table>
       ) : null}
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold text-neutral-300">Chaves de API</h2>
+      <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Chaves de API</h2>
       {accountList.length > 0 ? <ApiKeyForm accounts={accountList} disabled={!vaultOn} /> : null}
       {!error && apiKeys.length === 0 ? (
         <EmptyState>Nenhuma chave de API cadastrada ainda.</EmptyState>

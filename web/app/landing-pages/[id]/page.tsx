@@ -28,7 +28,7 @@ export default async function LandingPageEditor({ params }: { params: Promise<{ 
       <div className="mb-4 flex items-center gap-3 text-sm">
         <Badge value={lp.status} />
         <Badge value={lp.draft_status} />
-        <span className="text-neutral-500">{lp.noindex ? 'noindex' : 'indexável'}</span>
+        <span className="text-dim">{lp.noindex ? 'noindex' : 'indexável'}</span>
       </div>
 
       {error ? (
