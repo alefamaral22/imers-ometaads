@@ -1,259 +1,52 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useVoice } from './use-voice';
-import { Visualizer } from './visualizer';
-import { DEFAULT_MINIMAX_VOICE, MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
-
-interface ChatMsg {
-  role: 'user' | 'assistant';
-  text: string;
-}
-
-interface PendingAction {
-  id: string;
-  slug: string;
-  summary: string;
-  args: Record<string, string>;
-}
-
-interface SnapshotTrigger {
-  status: string;
-  jobId: string | null;
-}
-
-interface ChatResponse {
-  reply: string;
-  pending?: PendingAction;
-  job?: { status: string; jobId: string | null };
-  snapshot?: SnapshotTrigger;
-}
-
-interface HistoryTurn {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-// Polling do raio-x ao vivo (Onda 16): o job read-only termina em segundos; checamos com folga.
-const SNAPSHOT_POLL_INTERVAL_MS = 1500;
-const SNAPSHOT_POLL_MAX_ATTEMPTS = 14; // ~21s de janela antes de degradar com aviso amigável.
+import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
+import { SpeakingOrb } from './speaking-orb';
+import { useNexusChat } from './use-nexus-chat';
+import { MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
 
 /**
- * Widget do Nexus (client). Chat por texto e voz. Dois modos de voz:
+ * Widget do Nexus (canto). Toda a lógica de chat/voz vive em `useNexusChat` (compartilhada com o
+ * console "Operação ao vivo"); aqui é só a apresentação compacta:
  *  - **Push-to-talk** (🎤): aperta para falar, aperta de novo para enviar.
- *  - **Mãos-livres**: escuta contínua com VAD — fala quando quiser, o Nexus responde por voz e volta a
- *    ouvir sozinho (sem apertar nada entre as falas). Anti-eco: a escuta pausa enquanto o Nexus fala.
- * Tools de escrita exigem CONFIRMAÇÃO em dois turnos antes de enfileirar um job. Degrada para texto
- * quando a voz/IA não estão configuradas no servidor (respostas 503 viram mensagem amigável).
+ *  - **Mãos-livres**: escuta contínua com VAD; o Nexus responde por voz e volta a ouvir sozinho.
+ * Tools de escrita exigem CONFIRMAÇÃO em dois turnos antes de enfileirar um job.
  */
 export function NexusWidget() {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput] = useState('');
-  const [pending, setPending] = useState<PendingAction | null>(null);
-  const [loading, setLoading] = useState(false);
-  // Voz do TTS (só aplica ao provedor MiniMax; o ElevenLabs usa a voz da env e ignora).
-  const [ttsVoice, setTtsVoice] = useState(DEFAULT_MINIMAX_VOICE);
-  const voice = useVoice();
+  const {
+    messages,
+    input,
+    setInput,
+    pending,
+    loading,
+    voice,
+    ttsVoice,
+    setTtsVoice,
+    send,
+    confirm,
+    cancel,
+    toggleMic,
+    toggleHandsFree,
+    hfStatus,
+    speaking,
+    active,
+  } = useNexusChat();
 
-  const push = useCallback((m: ChatMsg) => setMessages((prev) => [...prev, m]), []);
-
-  // Chamada crua ao chat (sem efeitos de UI). Usada pelo turno normal e pela narração do raio-x.
-  const postChat = useCallback(
-    async (message: string, history: HistoryTurn[]): Promise<ChatResponse | null> => {
-      try {
-        const res = await fetch('/api/nexus/chat', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ message, history }),
-        });
-        if (!res.ok) return null;
-        return (await res.json()) as ChatResponse;
-      } catch {
-        return null;
-      }
-    },
-    [],
-  );
-
-  // Raio-x ao vivo: faz polling até o snapshot ficar pronto e então pede ao Nexus que narre (turno de
-  // follow-up). Degrada com um aviso falado se demorar. A narração já sai assertiva (regras do prompt).
-  const pollAndNarrate = useCallback(
-    async (jobId: string | null, history: HistoryTurn[]): Promise<void> => {
-      for (let attempt = 0; attempt < SNAPSHOT_POLL_MAX_ATTEMPTS; attempt++) {
-        await new Promise((r) => setTimeout(r, SNAPSHOT_POLL_INTERVAL_MS));
-        let ready = false;
-        try {
-          const q = jobId ? `?jobId=${encodeURIComponent(jobId)}` : '';
-          const res = await fetch(`/api/nexus/snapshot${q}`);
-          if (res.ok) ready = ((await res.json()) as { status?: string }).status === 'ready';
-        } catch {
-          /* tenta de novo no próximo tick */
-        }
-        if (ready) {
-          const data = await postChat(
-            'O raio-x ao vivo das campanhas ficou pronto. Leia o snapshot e me dê o resumo: a melhor, a pior e uma recomendação com número.',
-            history,
-          );
-          const reply = data?.reply ?? 'Puxei os números, mas não consegui resumir agora.';
-          push({ role: 'assistant', text: reply });
-          await voice.speak(reply, ttsVoice);
-          return;
-        }
-      }
-      const msg = 'Os números demoraram a chegar. Tenta de novo em instantes.';
-      push({ role: 'assistant', text: msg });
-      await voice.speak(msg, ttsVoice);
-    },
-    [postChat, push, voice, ttsVoice],
-  );
-
-  // Envia uma mensagem ao Nexus e FALA a resposta. Resolve só quando o áudio termina, para que o
-  // loop de mãos-livres só volte a escutar depois que o Nexus parar de falar.
-  const send = useCallback(
-    async (text: string): Promise<void> => {
-      const trimmed = text.trim();
-      if (trimmed.length === 0 || loading) return;
-      push({ role: 'user', text: trimmed });
-      setInput('');
-      setLoading(true);
-      let reply: string | null = null;
-      let snapshot: SnapshotTrigger | null = null;
-      try {
-        const history = messages.map((m) => ({ role: m.role, content: m.text }));
-        const res = await fetch('/api/nexus/chat', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ message: trimmed, history }),
-        });
-        if (res.status === 503) {
-          push({
-            role: 'assistant',
-            text: 'Nexus indisponível no momento — tente de novo em instantes.',
-          });
-          return;
-        }
-        if (res.status === 429) {
-          push({
-            role: 'assistant',
-            text: 'Muitas mensagens em pouco tempo — aguarde alguns segundos e repita.',
-          });
-          return;
-        }
-        if (!res.ok) {
-          push({ role: 'assistant', text: 'Não consegui processar agora — tente de novo.' });
-          return;
-        }
-        const data = (await res.json()) as ChatResponse;
-        push({ role: 'assistant', text: data.reply });
-        setPending(data.pending ?? null);
-        reply = data.reply;
-        snapshot = data.snapshot ?? null;
-      } finally {
-        setLoading(false);
-      }
-      // Fala fora do bloco de loading: a UI já liberou, mas o caller (mãos-livres) aguarda o áudio.
-      if (reply) await voice.speak(reply, ttsVoice);
-      // Raio-x ao vivo disparado: aguarda ficar pronto e narra (o mãos-livres só re-escuta depois).
-      if (snapshot) {
-        const history: HistoryTurn[] = [
-          ...messages.map((m) => ({ role: m.role, content: m.text })),
-          { role: 'user', content: trimmed },
-          { role: 'assistant', content: reply ?? '' },
-        ];
-        await pollAndNarrate(snapshot.jobId, history);
-      }
-    },
-    [loading, messages, push, voice, ttsVoice, pollAndNarrate],
-  );
-
-  // Mãos-livres: cada fala detectada vira um turno. Pausa a escuta durante o processamento (anti-eco
-  // e evita turnos sobrepostos); a retomada acontece após o Nexus terminar de falar (send aguarda o TTS).
-  const handleUtterance = useCallback(
-    async (blob: Blob): Promise<void> => {
-      voice.setHandsFreePaused(true);
-      try {
-        const text = await voice.transcribeBlob(blob);
-        if (text && text.trim()) await send(text);
-      } finally {
-        voice.setHandsFreePaused(false);
-      }
-    },
-    [voice, send],
-  );
-
-  // Wrapper estável: o hook guarda o callback no início do modo; usamos um ref para sempre chamar a
-  // versão mais recente (com o histórico de mensagens atualizado), sem reiniciar a escuta.
-  const handleUtteranceRef = useRef(handleUtterance);
+  // Rola para a última mensagem.
+  const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    handleUtteranceRef.current = handleUtterance;
-  }, [handleUtterance]);
-  const stableOnUtterance = useCallback((blob: Blob) => handleUtteranceRef.current(blob), []);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
 
-  const toggleHandsFree = useCallback(async () => {
-    if (voice.handsFree) {
-      voice.stopHandsFree();
-      return;
-    }
-    try {
-      await voice.startHandsFree(stableOnUtterance);
-    } catch {
-      push({
-        role: 'assistant',
-        text: 'Não consegui acessar o microfone — verifique a permissão do navegador para este site.',
-      });
-    }
-  }, [voice, stableOnUtterance, push]);
-
-  const confirm = useCallback(async () => {
-    if (!pending || loading) return;
-    setLoading(true);
-    let reply: string | null = null;
-    try {
-      const res = await fetch('/api/nexus/confirm', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id: pending.id, slug: pending.slug, args: pending.args }),
-      });
-      const data = (await res.json().catch(() => ({ reply: 'Falhou.' }))) as ChatResponse;
-      push({ role: 'assistant', text: data.reply });
-      reply = data.reply;
-    } finally {
-      setPending(null);
-      setLoading(false);
-    }
-    if (reply) await voice.speak(reply, ttsVoice);
-  }, [pending, loading, push, voice, ttsVoice]);
-
-  const cancel = useCallback(() => {
-    setPending(null);
-    push({ role: 'assistant', text: 'Cancelado — nada foi enfileirado.' });
-  }, [push]);
-
-  const toggleMic = useCallback(async () => {
-    if (voice.recording) {
-      const text = await voice.stopAndTranscribe();
-      if (text) await send(text);
-    } else {
-      try {
-        await voice.startRecording();
-      } catch {
-        push({
-          role: 'assistant',
-          text: 'Não consegui acessar o microfone — verifique a permissão do navegador para este site.',
-        });
-      }
-    }
-  }, [voice, send, push]);
-
-  // Texto de estado do modo mãos-livres.
-  const hfStatus = voice.speaking
-    ? 'Nexus falando…'
+  const statusLabel = speaking
+    ? 'FALANDO'
     : loading || voice.busy
-      ? 'Processando…'
+      ? 'PROCESSANDO'
       : voice.listening
-        ? 'Ouvindo… pode falar'
-        : 'Mãos-livres ligado';
+        ? 'OUVINDO'
+        : 'ONLINE';
 
   if (!open) {
     return (
@@ -269,14 +62,32 @@ export function NexusWidget() {
   }
 
   return (
-    <div className="fixed right-6 bottom-6 z-50 flex h-[28rem] w-80 flex-col rounded-xl border border-accent/25 bg-panel/95 shadow-[0_0_50px_-12px_rgba(56,230,255,0.5)] backdrop-blur-md">
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="glow-strong fixed right-6 bottom-6 z-50 flex h-[34rem] w-[22rem] flex-col overflow-hidden rounded-xl border border-accent/25 bg-panel/95 backdrop-blur-md"
+    >
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px scan-top bg-gradient-to-r from-transparent via-accent to-transparent"
+      />
       <header className="flex items-center justify-between border-b border-edge/60 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span aria-hidden className="reactor h-4 w-4" />
-          <span className="text-xs font-bold tracking-[0.2em] text-ink uppercase">
+          <span className="text-display text-sm font-bold tracking-[0.16em] text-ink uppercase">
             Ne<span className="text-accent text-glow">xus</span>
           </span>
-          <Visualizer active={voice.recording || voice.listening || voice.speaking || loading} />
+          <span
+            className={`ml-1 rounded-full border px-2 py-0.5 text-[8px] font-semibold tracking-[0.15em] uppercase ${
+              speaking || active
+                ? 'border-accent/50 bg-accent/15 text-accent'
+                : 'border-edge/70 text-dim'
+            }`}
+            aria-live="polite"
+          >
+            {statusLabel}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -284,7 +95,7 @@ export function NexusWidget() {
             onChange={(e) => setTtsVoice(e.target.value)}
             aria-label="Voz do Nexus (MiniMax)"
             title="Voz do Nexus (aplica ao provedor MiniMax)"
-            className="max-w-[8rem] rounded-md border border-edge/70 bg-bg/60 px-1.5 py-1 text-[11px] text-dim outline-none focus:border-accent"
+            className="max-w-[7rem] rounded-md border border-edge/70 bg-bg/60 px-1.5 py-1 text-[11px] text-dim outline-none focus:border-accent"
           >
             {MINIMAX_PT_VOICES.map((v) => (
               <option key={v.id} value={v.id}>
@@ -295,12 +106,25 @@ export function NexusWidget() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-dim transition-colors hover:text-accent"
+            aria-label="Fechar Nexus"
+            className="text-lg leading-none text-dim transition-colors hover:text-accent"
           >
             ×
           </button>
         </div>
       </header>
+
+      {/* faixa de fala ao vivo — orbe que pulsa quando o Nexus fala/ouve */}
+      <div className="relative flex items-center justify-center border-b border-edge/50 bg-bg/30 py-4">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: 'radial-gradient(circle at 50% 60%, rgba(56,230,255,0.08), transparent 60%)',
+          }}
+        />
+        <SpeakingOrb speaking={speaking} active={active} size={84} />
+      </div>
 
       {voice.supported ? (
         <div className="flex items-center justify-between border-b border-edge/60 px-4 py-2">
@@ -336,7 +160,13 @@ export function NexusWidget() {
           </p>
         ) : (
           messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className={m.role === 'user' ? 'text-right' : 'text-left'}
+            >
               <span
                 className={`inline-block rounded-lg border px-3 py-1.5 ${
                   m.role === 'user'
@@ -346,9 +176,10 @@ export function NexusWidget() {
               >
                 {m.text}
               </span>
-            </div>
+            </motion.div>
           ))
         )}
+        <div ref={bottomRef} />
       </div>
 
       {pending ? (
@@ -408,6 +239,6 @@ export function NexusWidget() {
           Enviar
         </button>
       </form>
-    </div>
+    </motion.div>
   );
 }

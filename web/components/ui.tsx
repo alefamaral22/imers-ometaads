@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 /**
  * Primitivos do design system "Neural Core" (Tailwind v4 tokens em globals.css). Como toda página
@@ -48,10 +48,19 @@ const TONE_PILL: Record<Tone, string> = {
   muted: 'border-edge text-dim bg-white/5',
 };
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = '',
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
     <div
-      className={`relative rounded-lg border border-edge/60 bg-panel/70 p-5 backdrop-blur-sm panel-glow ${className}`}
+      style={style}
+      className={`relative rounded-lg border border-edge/60 bg-panel/70 p-5 backdrop-blur-sm panel-glow transition-[border-color,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-accent/30 ${className}`}
     >
       {children}
     </div>
@@ -81,16 +90,18 @@ export function Stat({
   hint?: string;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-edge/60 bg-panel/70 p-4 backdrop-blur-sm panel-glow">
+    <div className="group relative overflow-hidden rounded-lg border border-edge/60 bg-panel/70 p-4 backdrop-blur-sm panel-glow transition-[border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-edge">
       <span
         aria-hidden
-        className={`absolute inset-x-0 top-0 h-px scan-top bg-gradient-to-r from-transparent ${TONE_BAR[tone]} to-transparent opacity-70`}
+        className={`absolute inset-x-0 top-0 h-px scan-top bg-gradient-to-r from-transparent ${TONE_BAR[tone]} to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-100`}
       />
       <p className="text-[10px] tracking-[0.18em] text-dim uppercase">{label}</p>
-      <p className={`mt-1.5 text-2xl font-bold tracking-tight text-glow ${TONE_TEXT[tone]}`}>
+      <p
+        className={`text-display mt-1.5 text-[1.6rem] leading-none font-bold tracking-tight text-glow ${TONE_TEXT[tone]}`}
+      >
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-[10px] text-dim">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[10px] text-ink/55">{hint}</p> : null}
     </div>
   );
 }
@@ -147,16 +158,40 @@ export function Table({ children }: { children: ReactNode }) {
   );
 }
 
-export function Th({ children }: { children: ReactNode }) {
+export function Th({ children, right = false }: { children: ReactNode; right?: boolean }) {
   return (
-    <th className="border-b border-edge/60 bg-panel/80 px-4 py-2.5 text-[10px] font-medium tracking-[0.16em] text-dim uppercase">
+    <th
+      className={`border-b border-edge/60 bg-panel/80 px-4 py-2.5 text-[10px] font-medium tracking-[0.16em] text-dim uppercase ${
+        right ? 'text-right' : 'text-left'
+      }`}
+    >
       {children}
     </th>
   );
 }
 
-export function Td({ children }: { children: ReactNode }) {
-  return <td className="border-b border-edge/30 px-4 py-2.5 text-ink/90">{children}</td>;
+/**
+ * Célula. `num` alinha à direita e usa a MESMA tipografia dos KPIs (fonte display + tabular-nums),
+ * para que um valor leia igual num card e numa tabela — consistência pedida no design system.
+ */
+export function Td({
+  children,
+  num = false,
+}: {
+  children: ReactNode;
+  num?: boolean;
+}) {
+  return (
+    <td
+      className={`border-b border-edge/30 px-4 py-2.5 ${
+        num
+          ? 'text-display text-right tracking-tight text-ink tabular-nums whitespace-nowrap'
+          : 'text-ink/90'
+      }`}
+    >
+      {children}
+    </td>
+  );
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
@@ -165,14 +200,21 @@ export function EmptyState({ children }: { children: ReactNode }) {
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <header className="mb-6">
-      <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-[0.2em] text-ink uppercase">
-        <span aria-hidden className="text-accent text-glow">
+    <header className="mb-7">
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden className="text-glow text-lg leading-none text-accent">
           ◈
         </span>
-        {title}
-      </h1>
-      {subtitle ? <p className="mt-1.5 text-xs tracking-wide text-dim">{subtitle}</p> : null}
+        <h1 className="text-display text-[1.7rem] leading-none font-bold tracking-[0.14em] text-ink uppercase">
+          {title}
+        </h1>
+      </div>
+      {/* régua de varredura sob o título — assinatura HUD discreta */}
+      <div
+        aria-hidden
+        className="mt-3 h-px w-full max-w-md bg-gradient-to-r from-accent/60 via-accent/15 to-transparent"
+      />
+      {subtitle ? <p className="mt-2 text-xs tracking-wide text-ink/70">{subtitle}</p> : null}
     </header>
   );
 }

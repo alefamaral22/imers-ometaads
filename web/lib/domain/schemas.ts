@@ -170,6 +170,28 @@ export const funnelEventRowSchema = z.object({
 });
 export type FunnelEventRow = z.infer<typeof funnelEventRowSchema>;
 
+// public.metric_snapshots — métricas por entidade/análise (produzidas pela skill funnel-analytics).
+// Numéricos vêm como number|null do PostgREST; bigint vira number (valores cabem em double com folga).
+export const metricSnapshotRowSchema = z.object({
+  id: z.string().uuid(),
+  analysis_id: z.string().uuid(),
+  level: funnelLevel,
+  meta_entity_id: z.string().nullable(),
+  impressions: z.number().nullable(),
+  spend_cents: z.number().nullable(),
+  ctr: z.number().nullable(),
+  cpc_cents: z.number().nullable(),
+  cpm_cents: z.number().nullable(),
+  landing_page_views: z.number().nullable(),
+  cplpv_cents: z.number().nullable(),
+  results: z.number().nullable(),
+  cost_per_result_cents: z.number().nullable(),
+  conversations: z.number().nullable(), // WhatsApp/messaging: null distingue não-messaging de zero conversas
+  replies: z.number().nullable(),
+  created_at: ts,
+});
+export type MetricSnapshotRow = z.infer<typeof metricSnapshotRowSchema>;
+
 // public.landing_pages
 export const lpStatus = z.enum(['draft', 'building', 'deployed', 'failed']);
 export const lpDraftStatus = z.enum(['empty', 'generating', 'ready', 'editing', 'publishing']);

@@ -28,6 +28,8 @@ export interface RawInsights {
   cpm?: number | string | null; // unidades da moeda
   landing_page_views?: number | string | null;
   results?: number | string | null; // contagem do north-star (se a skill já souber)
+  conversations?: number | string | null; // conversas de mensagem iniciadas (WhatsApp/messaging)
+  replies?: number | string | null; // respostas dentro das conversas
   rankings?: Record<string, unknown> | null; // quality/engagement/conversion ranking
 }
 
@@ -43,6 +45,8 @@ export interface MetricSnapshot {
   cplpv_cents: number | null;
   results: number | null;
   cost_per_result_cents: number | null;
+  conversations: number | null; // null em campanha não-WhatsApp (distingue "sem conversa" de "não-messaging")
+  replies: number | null;
   rankings: Record<string, unknown> | null;
   raw: Record<string, unknown>;
 }
@@ -59,6 +63,8 @@ export function buildSnapshot(raw: RawInsights): MetricSnapshot {
   const spendCents = currencyToCents(raw.spend);
   const lpv = toCount(raw.landing_page_views);
   const results = toCount(raw.results);
+  const conversations = toCount(raw.conversations);
+  const replies = toCount(raw.replies);
 
   const ctr =
     raw.ctr !== null && raw.ctr !== undefined && Number.isFinite(Number(raw.ctr))
@@ -86,6 +92,8 @@ export function buildSnapshot(raw: RawInsights): MetricSnapshot {
     cplpv_cents: costPerEventCents(spendCents, lpv),
     results,
     cost_per_result_cents: costPerEventCents(spendCents, results),
+    conversations,
+    replies,
     rankings: raw.rankings ?? null,
     raw: { ...raw },
   };

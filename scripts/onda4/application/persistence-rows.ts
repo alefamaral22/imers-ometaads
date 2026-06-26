@@ -37,6 +37,8 @@ export function snapshotRow(analysisId: string, s: MetricSnapshot): Record<strin
     cplpv_cents: s.cplpv_cents,
     results: s.results,
     cost_per_result_cents: s.cost_per_result_cents,
+    conversations: s.conversations,
+    replies: s.replies,
     rankings: s.rankings,
     raw: s.raw,
   };

@@ -35,8 +35,15 @@ SPEC `docs/specs/meta-ads-funnel-analytics.md`.
 3. **Leitura na Meta (read-only)** — para cada campanha/ad_set/ad relevante, leia insights e o
    breakdown de ações (impressões, gasto, cliques, ctr, cpc, cpm, landing_page_view, view_content,
    add_to_cart, initiate_checkout, purchase, purchase value). Use só as tools de leitura/insights.
+   - **Campanhas de mensagem (WhatsApp)** — quando o objetivo for de mensagem (ex.: `OUTCOME_ENGAGEMENT`
+     com destino de mensagem, ou `MESSAGES`), leia também as ações de conversa:
+     `onsite_conversion.total_messaging_connection` / `messaging_conversation_started_7d` →
+     **conversas iniciadas**, e `onsite_conversion.messaging_reply` (ou equivalente de resposta) →
+     **respostas**. Só preencha esses campos para campanhas de mensagem.
 4. **Achatar para `RawInsights` + `FunnelInput`** — monte, por entidade, o objeto plano que o domínio
    espera (`scripts/onda4/domain/metrics.ts` / `funnel.ts`). Este é o ponto de validação da fronteira.
+   Em campanha de mensagem, inclua `conversations` e `replies` no `RawInsights`; **omita-os** (deixe
+   `undefined` → vira `null`) em campanha de tráfego/vendas, para não marcá-la como WhatsApp.
 5. **Plano puro** — calcule tudo com a lógica testada:
 
    ```bash

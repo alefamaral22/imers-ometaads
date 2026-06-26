@@ -23,6 +23,7 @@ import { listLandingPages } from '../../../lib/services/landing-pages';
 import { listOperationLogs } from '../../../lib/services/logs';
 import { listNarrations } from '../../../lib/services/narrations';
 import { getLatestSnapshot, getSnapshotByJobId } from '../../../lib/services/live-snapshots';
+import { getAgentPulse } from '../../../lib/services/agent-jobs';
 import {
   chatRequestSchema,
   confirmRequestSchema,
@@ -197,6 +198,13 @@ app.get('/data/logs', async (c) => {
   const claims = await apiClaims(c);
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
   return c.json({ logs: await listOperationLogs(scopeFromClaims(claims)) });
+});
+
+// Pulso dos agentes (Operação ao vivo) — contagem de jobs em voo, escopada por account. Polling leve.
+app.get('/data/ops-pulse', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  return c.json(await getAgentPulse(scopeFromClaims(claims)));
 });
 
 // ── Onda 12 — multi-tenant: accounts, conexões Meta e chaves de API ────────────
