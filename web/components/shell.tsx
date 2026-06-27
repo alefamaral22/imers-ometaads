@@ -40,7 +40,7 @@ export async function Shell({ children }: { children: ReactNode }) {
                   Neural · Core · System
                 </span>
                 <span className="mt-0.5 text-sm font-bold tracking-[0.18em] text-ink uppercase">
-                  Acme <span className="text-accent text-glow">· Nexus</span>
+                  Acme <span className="text-accent text-glow">· Trafegante</span>
                 </span>
               </span>
             </Link>

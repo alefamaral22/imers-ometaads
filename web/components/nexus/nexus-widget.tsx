@@ -58,7 +58,7 @@ export function NexusWidget() {
         className="group fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-full border border-accent/40 bg-panel/90 px-5 py-3 text-[11px] font-semibold tracking-[0.18em] text-accent uppercase shadow-[0_0_30px_-6px_rgba(56,230,255,0.6)] backdrop-blur transition-colors hover:bg-accent/10"
       >
         <span aria-hidden className="reactor h-4 w-4" />
-        Nexus
+        Trafegante
       </button>
     );
   }
@@ -95,8 +95,8 @@ export function NexusWidget() {
           <select
             value={ttsVoice}
             onChange={(e) => setTtsVoice(e.target.value)}
-            aria-label="Voz do Nexus (MiniMax)"
-            title="Voz do Nexus (aplica ao provedor MiniMax)"
+            aria-label="Voz do Trafegante (MiniMax)"
+            title="Voz do Trafegante (aplica ao provedor MiniMax)"
             className="max-w-[7rem] rounded-md border border-edge/70 bg-bg/60 px-1.5 py-1 text-[11px] text-dim outline-none focus:border-accent"
           >
             {MINIMAX_PT_VOICES.map((v) => (
@@ -108,7 +108,7 @@ export function NexusWidget() {
           <button
             type="button"
             onClick={() => setOpen(false)}
-            aria-label="Fechar Nexus"
+            aria-label="Fechar Trafegante"
             className="text-lg leading-none text-dim transition-colors hover:text-accent"
           >
             ×

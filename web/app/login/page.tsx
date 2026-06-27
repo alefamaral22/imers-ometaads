@@ -56,7 +56,7 @@ export default function LoginPage() {
           Neural · Core · System
         </p>
         <h1 className="mt-1 text-center text-lg font-bold tracking-[0.18em] text-ink uppercase">
-          Acme <span className="text-accent text-glow">· Nexus</span>
+          Acme <span className="text-accent text-glow">· Trafegante</span>
         </h1>
         <p className="mt-1 text-center text-xs text-dim">Acesso por conta. Restrito.</p>
 

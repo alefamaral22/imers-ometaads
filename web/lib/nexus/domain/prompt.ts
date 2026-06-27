@@ -4,7 +4,7 @@
  * skills resolvidas por slug no servidor. Pura (string determinística), testável.
  */
 
-export const NEXUS_NAME = 'Nexus';
+export const NEXUS_NAME = 'Trafegante';
 
 export function buildSystemPrompt(): string {
   return [

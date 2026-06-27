@@ -85,7 +85,7 @@ export default async function OverviewPage() {
     <Shell>
       <PageHeader
         title="Visão geral"
-        subtitle="Estado da agência de tráfego operada por IAs (Nexus)."
+        subtitle="Estado da agência de tráfego operada por IAs (Trafegante)."
       />
 
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
@@ -109,7 +109,7 @@ export default async function OverviewPage() {
                 I.A. Copiloto · Neural Core · ao vivo
               </p>
               <h2 className="text-display mt-3 text-4xl leading-none font-bold tracking-[0.06em] text-ink uppercase">
-                Ativar <span className="text-accent text-glow">Nexus</span>
+                Ativar <span className="text-accent text-glow">Trafegante</span>
               </h2>
               <p className="mt-3 max-w-md text-xs leading-relaxed text-ink/70">
                 Abra a <span className="text-accent">Operação ao vivo</span> — painel Jarvis em tela

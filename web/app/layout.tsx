@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Acme — Dashboard',
-  description: 'Painel do operador da agência de tráfego Meta Ads operada por IAs (Nexus).',
+  description: 'Painel do operador da agência de tráfego Meta Ads operada por IAs (Trafegante).',
   robots: { index: false, follow: false },
 };
 

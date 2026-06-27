@@ -118,7 +118,7 @@ export function useNexusChat() {
         if (res.status === 503) {
           push({
             role: 'assistant',
-            text: 'Nexus indisponível no momento — tente de novo em instantes.',
+            text: 'Trafegante indisponível no momento — tente de novo em instantes.',
           });
           return;
         }
@@ -230,7 +230,7 @@ export function useNexusChat() {
   }, [voice, send, push]);
 
   const hfStatus = voice.speaking
-    ? 'Nexus falando…'
+    ? 'Trafegante falando…'
     : loading || voice.busy
       ? 'Processando…'
       : voice.listening

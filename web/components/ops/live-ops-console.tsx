@@ -159,7 +159,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
             <p className="text-xs leading-relaxed text-ink/85">
               {pulse.jobs[0]
                 ? `Agente em execução: ${pulse.jobs[0].skill}${pulse.jobs[0].kind ? ` (${pulse.jobs[0].kind})` : ''}.`
-                : (data.nextStep ?? 'Sem ação pendente. Peça um raio-x ao Nexus para começar.')}
+                : (data.nextStep ?? 'Sem ação pendente. Peça um raio-x ao Trafegante para começar.')}
             </p>
           </Panel>
 
@@ -197,7 +197,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
             {working
               ? 'Núcleo aquecido — agentes processando'
               : speaking
-                ? 'Núcleo ressoando — Nexus falando'
+                ? 'Núcleo ressoando — Trafegante falando'
                 : 'Núcleo em repouso'}
           </p>
         </motion.div>
@@ -308,7 +308,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
               <select
                 value={nexus.ttsVoice}
                 onChange={(e) => nexus.setTtsVoice(e.target.value)}
-                aria-label="Voz do Nexus (MiniMax)"
+                aria-label="Voz do Trafegante (MiniMax)"
                 className="max-w-[7rem] rounded-md border border-edge/70 bg-bg/60 px-1.5 py-1 text-[11px] text-dim outline-none focus:border-accent"
               >
                 {MINIMAX_PT_VOICES.map((v) => (
