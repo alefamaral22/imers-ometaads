@@ -48,23 +48,28 @@ export const themeSchema = z
 export type Theme = z.infer<typeof themeSchema>;
 
 // Deterministic default theme — used when a draft has not customized its tokens yet.
+// Fonts pair an idiosyncratic display grotesque (Bricolage Grotesque) with a calm humanist body
+// (Figtree): a deliberate contrast pairing that avoids the Inter/Fraunces faces now so common they
+// read as AI defaults. They are loaded by the template (`<link>` in layout.tsx), so the names here
+// must match what the template loads. `muted` is kept dark enough for ≥4.5:1 body contrast on white
+// (the most common a11y failure for AI palettes).
 export const defaultTheme: Theme = {
   colors: {
-    primary: '#2563eb',
+    primary: '#4338ca',
     primaryForeground: '#ffffff',
-    secondary: '#1e293b',
-    accent: '#f59e0b',
+    secondary: '#0f172a',
+    accent: '#f97316',
     background: '#ffffff',
-    foreground: '#0f172a',
-    muted: '#64748b',
-    border: '#e2e8f0',
-    success: '#16a34a',
+    foreground: '#0b1120',
+    muted: '#475569',
+    border: '#e5e7eb',
+    success: '#15803d',
     destructive: '#dc2626',
   },
   fonts: {
-    heading: "'Inter', system-ui, sans-serif",
-    body: "'Inter', system-ui, sans-serif",
+    heading: "'Bricolage Grotesque', system-ui, sans-serif",
+    body: "'Figtree', system-ui, sans-serif",
   },
-  radius: '12px',
-  maxWidth: '1200px',
+  radius: '14px',
+  maxWidth: '1140px',
 };

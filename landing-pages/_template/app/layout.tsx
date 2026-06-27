@@ -20,6 +20,17 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }): ReactNode {
   return (
     <html lang={contentSpec.settings.locale}>
+      <head>
+        {/* Platform type pairing: Bricolage Grotesque (display) + Figtree (body). Loaded at the
+            visitor's browser (not build time) so the static export never depends on network
+            during the headless build. preconnect + display=swap avoid FOIT/layout shift. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Figtree:wght@400..700&display=swap"
+        />
+      </head>
       <body>{children}</body>
     </html>
   );
