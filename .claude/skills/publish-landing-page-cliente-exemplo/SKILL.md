@@ -1,7 +1,7 @@
 ---
 name: publish-landing-page-cliente-exemplo
 description: Publica uma landing page do cliente-exemplo em preview — serializa o ContentDoc do banco (@template/lp-render) para o template, roda next build (static export) e faz wrangler deploy no Cloudflare Pages em <subdomain>.example.com. Patcha landing_pages (deployed). Headless e idempotente.
-allowed-tools: Read, Write, Glob, Bash(npx tsx:*), Bash(npm:*), Bash(npx wrangler:*)
+allowed-tools: Read, Write, Glob, Bash(npx tsx:*), Bash(npm:*), Bash(npx wrangler:*), Bash(sleep:*), Bash(tail:*), Bash(cat:*), Bash(ls:*)
 ---
 
 # publish-landing-page-cliente-exemplo
@@ -44,6 +44,8 @@ Skill **headless** que **serializa do banco → builda → publica**. Conteúdo 
    `out/`). Rode em **UMA chamada Bash síncrona** e **AGUARDE terminar** — NÃO lance em segundo plano e
    NÃO relance em paralelo se demorar (duas builds simultâneas corrompem o `.next`). O script `build:ci`
    já limpa `.next`/`out` antes e capa o heap do Node (memória do VM); se falhar, **aborte** sem deploy.
+   (O runner headless executa comandos longos como tarefa de fundo e faz polling com `sleep`/`tail` —
+   por isso eles estão no `allowed-tools`; sem isso o build "compila" mas a skill trava sem confirmar.)
 5. **Deploy** — `npx wrangler pages deploy landing-pages/_template/out --project-name
    cliente-exemplo-<subdomain>` (cria/atualiza o projeto Pages; idempotente). Capture a URL.
 6. **Patch** — `upsertRow('landing_pages', { subdomain, ...publishPatch({url, fqdn, snapshot}) },
