@@ -38,6 +38,11 @@ fail() {
   npm run build:ci || fail "build"
   [ -d out ] || fail "export não gerou out/"
 
+  # `wrangler pages deploy` NÃO cria o projeto — exige que ele já exista (senão "Project not found").
+  # Criamos antes; se já existir, o create falha e o `|| true` ignora (idempotente).
+  echo "publish-lp: garantindo o projeto Pages…"
+  npx wrangler pages project create "cliente-exemplo-${SUBDOMAIN}" --production-branch main >>"$LOG" 2>&1 || true
+
   echo "publish-lp: wrangler pages deploy…"
   deploy_log="$(npx wrangler pages deploy out --project-name "cliente-exemplo-${SUBDOMAIN}" 2>&1)"
   echo "$deploy_log"
