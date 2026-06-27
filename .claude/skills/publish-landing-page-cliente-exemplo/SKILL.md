@@ -1,7 +1,7 @@
 ---
 name: publish-landing-page-cliente-exemplo
 description: Publica uma landing page do cliente-exemplo em preview — serializa o ContentDoc do banco (@template/lp-render) para o template, roda next build (static export) e faz wrangler deploy no Cloudflare Pages em <subdomain>.example.com. Patcha landing_pages (deployed). Headless e idempotente.
-allowed-tools: Read, Write, Glob, Bash(npx tsx:*), Bash(bash scripts/publish-lp.sh:*), Bash(sleep:*), Bash(tail:*), Bash(cat:*), Bash(ls:*)
+allowed-tools: Read, Write, Glob, Bash(npx tsx:*), Bash(bash scripts/publish-lp-launch.sh:*)
 ---
 
 # publish-landing-page-cliente-exemplo
@@ -16,6 +16,10 @@ Skill **headless** que **serializa do banco → builda → publica**. Conteúdo 
 - Serializa **a partir do banco** (não de arquivos soltos): single source of truth.
 - Idempotente: re-publicar o mesmo subdomain atualiza o mesmo projeto Pages.
 - Segredos (`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`) só via env. Sem PII em logs/manifest.
+- **Build assíncrono**: o `next build` leva ~10 min no VM, acima do timeout de 10 min da ferramenta
+  Bash. Por isso a skill NÃO builda nem deploya: ela serializa, marca a LP `building` e lança o worker
+  **destacado** (`scripts/publish-lp-launch.sh` → `scripts/publish-lp.sh`), que grava `deployed`+url
+  (ou `failed`) sozinho. A skill termina em segundos; a UI mostra "Em construção" até o worker concluir.
 
 ## Pré-condições
 
@@ -40,23 +44,19 @@ Skill **headless** que **serializa do banco → builda → publica**. Conteúdo 
    ```
 
    (gera `content-spec.json` + `messages/pt.json` + `theme.css`).
-4. **Build + deploy (uma chamada bloqueante)** — rode **exatamente**:
+4. **Lançar build+deploy em background** — rode **exatamente** (uma única chamada, retorna em segundos):
 
    ```bash
-   bash scripts/publish-lp.sh <SUBDOMAIN>
+   bash scripts/publish-lp-launch.sh <SUBDOMAIN>
    ```
 
-   O script builda o export estático (limpa `.next`/`out`, capa o heap) **e** faz `wrangler pages
-   deploy` no Cloudflare Pages, tudo numa execução bloqueante. **AGUARDE o comando RETORNAR** — não o
-   lance em segundo plano, não emita nenhuma mensagem nem rode outro comando até ele terminar (o passo
-   é lento; se você responder no meio, o loop encerra antes do deploy = falso-verde). Ao final ele
-   imprime `PUBLISH_LP_URL=<url>` — **capture essa URL**. Se o comando sair ≠ 0, **aborte** sem patch.
-5. **Patch** — `upsertRow('landing_pages', { subdomain, ...publishPatch({url, fqdn, snapshot}) },
-   'subdomain')` usando a `url` capturada: `status='deployed'`, `url`, `ssl_status`,
-   `published_snapshot`. `operation_logs` (`action='update'`, `actor='skill'`).
-6. **Manifest** — `tentativas-geracao-de-campanhas/<stamp>-landing-publish.json` (`buildPublishManifest`).
+   Isso marca a LP como `building` e dispara o worker **destacado** que builda o export estático e faz
+   `wrangler pages deploy`, gravando ele mesmo `status='deployed'`+`url` (ou `failed`) ao terminar
+   (~10 min depois). **NÃO** rode o build nem o deploy você mesmo, e **NÃO** fique esperando/poll — só
+   confirme que o lançador retornou e **encerre relatando** que a publicação está em andamento (building).
 
 ## Critérios de aceite
 
-Builda o `_template` (`next build` verde) e publica uma página acessível (200) em preview; patcha
-`landing_pages` para `deployed` com `url`; re-publicar não duplica projeto; manifest escrito.
+A skill serializa do banco, marca `building` e retorna em segundos com o worker lançado; o worker
+publica uma página acessível (200) em preview e patcha `landing_pages` para `deployed` com `url`
+(ou `failed` em erro); re-publicar não duplica o projeto Pages.

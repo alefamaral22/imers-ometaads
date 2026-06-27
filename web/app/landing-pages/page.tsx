@@ -6,6 +6,7 @@ import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { CreateLandingForm } from '../../components/landing/create-landing-form';
 import { CopyLink } from '../../components/landing/copy-link';
+import { BuildingAutoRefresh } from '../../components/landing/building-autorefresh';
 import { formatCents, formatDate } from '../../lib/domain/format';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,9 @@ export default async function LandingPagesPage() {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
   }
 
+  // Há publicação em andamento? Se sim, a lista se atualiza sozinha até virar deployed/failed.
+  const hasBuilding = pages.some((p) => p.status === 'building');
+
   return (
     <Shell>
       <PageHeader
@@ -28,6 +32,7 @@ export default async function LandingPagesPage() {
         subtitle="Páginas geradas e publicadas. Rascunhos nascem noindex (preview)."
       />
       <CreateLandingForm />
+      <BuildingAutoRefresh active={hasBuilding} />
 
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
       {!error && pages.length === 0 ? <EmptyState>Nenhuma landing page ainda.</EmptyState> : null}
@@ -59,7 +64,18 @@ export default async function LandingPagesPage() {
                   <Badge value={p.status} />
                 </Td>
                 <Td>{p.draft_status}</Td>
-                <Td>{p.url ? <CopyLink url={p.url} /> : <span className="text-dim">—</span>}</Td>
+                <Td>
+                  {p.url ? (
+                    <CopyLink url={p.url} />
+                  ) : p.status === 'building' ? (
+                    <span className="flex items-center gap-1.5 text-accent-2">
+                      <span aria-hidden className="reactor h-3 w-3" />
+                      em construção — pode levar ~10 min
+                    </span>
+                  ) : (
+                    <span className="text-dim">—</span>
+                  )}
+                </Td>
                 <Td>{formatCents(p.price_cents)}</Td>
                 <Td>{p.cart_state}</Td>
                 <Td>{p.noindex ? 'noindex' : 'indexável'}</Td>
