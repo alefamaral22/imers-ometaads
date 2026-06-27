@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { endEvent, mapStreamLine, startEvent } from '../domain/agent-event.ts';
+import {
+  endEvent,
+  extractResultError,
+  mapStreamLine,
+  startEvent,
+} from '../domain/agent-event.ts';
 
 const RUN = 'job-123';
 
@@ -52,6 +57,35 @@ describe('mapStreamLine', () => {
     });
     const [ev] = mapStreamLine(line, RUN);
     expect(JSON.stringify(ev?.payload)).not.toContain('secret');
+  });
+});
+
+describe('extractResultError', () => {
+  it('extrai o texto de um result com is_error', () => {
+    const line = JSON.stringify({ type: 'result', is_error: true, result: 'Credit balance too low' });
+    expect(extractResultError(line)).toBe('Credit balance too low');
+  });
+
+  it('usa o subtype quando não há texto de result', () => {
+    const line = JSON.stringify({ type: 'result', subtype: 'error_during_execution' });
+    expect(extractResultError(line)).toBe('claude result: error_during_execution');
+  });
+
+  it('extrai mensagem de uma linha type=error', () => {
+    const line = JSON.stringify({ type: 'error', error: 'invalid x-api-key' });
+    expect(extractResultError(line)).toBe('invalid x-api-key');
+  });
+
+  it('retorna null para result de sucesso e para ruído', () => {
+    expect(extractResultError(JSON.stringify({ type: 'result', subtype: 'success' }))).toBeNull();
+    expect(extractResultError(JSON.stringify({ type: 'assistant' }))).toBeNull();
+    expect(extractResultError('not json')).toBeNull();
+    expect(extractResultError('   ')).toBeNull();
+  });
+
+  it('trunca mensagens muito longas em 2000 chars', () => {
+    const line = JSON.stringify({ type: 'result', is_error: true, result: 'x'.repeat(5000) });
+    expect(extractResultError(line)?.length).toBe(2000);
   });
 });
 

@@ -3,8 +3,9 @@
 // run_id vem de AGENT_RUN_ID (o id do job). Falhas de telemetria NUNCA derrubam a skill (best-effort).
 
 import { createInterface } from 'node:readline';
+import { writeFileSync } from 'node:fs';
 import process from 'node:process';
-import { mapStreamLine } from './domain/agent-event.ts';
+import { mapStreamLine, extractResultError } from './domain/agent-event.ts';
 import { readRunnerConfig, insertAgentEvent } from './infrastructure/supabase.ts';
 
 async function main(): Promise<void> {
@@ -16,8 +17,23 @@ async function main(): Promise<void> {
   const canEmit = Boolean(runId && process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
   const cfg = canEmit ? readRunnerConfig() : null;
 
+  // Arquivo lateral de diagnóstico: a mensagem de erro real do claude (linha `result`/`error` do
+  // stream) é gravada aqui para o poll-once promover a `agent_jobs.error`. Best-effort, fora da
+  // telemetria PII-safe. Mantém só o ÚLTIMO erro visto (sobrescreve).
+  const errorFile = process.env.RUNNER_ERROR_FILE;
+
   const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
   for await (const line of rl) {
+    if (errorFile) {
+      const errText = extractResultError(line);
+      if (errText) {
+        try {
+          writeFileSync(errorFile, errText);
+        } catch {
+          // best-effort: nunca quebra o pipe da skill por causa do diagnóstico
+        }
+      }
+    }
     if (!cfg || !runId) continue;
     for (const row of mapStreamLine(line, runId)) {
       // Best-effort: um erro de telemetria não pode falhar o job.

@@ -99,6 +99,55 @@ export function mapStreamLine(line: string, runId: string): AgentEventRow[] {
   return [];
 }
 
+/**
+ * Extrai a MENSAGEM DE ERRO legível de uma linha do stream-json quando o `claude` falha. Diferente de
+ * `mapStreamLine` (telemetria PII-safe, só estrutura), esta função é o instrumento de DIAGNÓSTICO: o
+ * texto vai para `agent_jobs.error` (visível só ao operador, RLS) para acabar com o "skill failed"
+ * genérico — ETAPA 1 "nunca silêncio". Retorna null se a linha não for um erro.
+ */
+export function extractResultError(line: string): string | null {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return null;
+  let msg: unknown;
+  try {
+    msg = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (typeof msg !== 'object' || msg === null) return null;
+  const m = msg as Record<string, unknown>;
+  const type = typeof m.type === 'string' ? m.type : '';
+
+  if (type === 'result') {
+    const subtype = typeof m.subtype === 'string' ? m.subtype : '';
+    const isError = m.is_error === true || (subtype !== '' && subtype !== 'success');
+    if (!isError) return null;
+    const text =
+      typeof m.result === 'string' && m.result.trim().length > 0
+        ? m.result.trim()
+        : typeof m.error === 'string' && m.error.trim().length > 0
+          ? m.error.trim()
+          : subtype !== ''
+            ? `claude result: ${subtype}`
+            : 'claude: erro desconhecido';
+    return text.slice(0, 2000);
+  }
+
+  if (type === 'error') {
+    const text =
+      typeof m.error === 'string'
+        ? m.error
+        : typeof m.message === 'string'
+          ? m.message
+          : typeof m.subtype === 'string'
+            ? m.subtype
+            : 'error';
+    return String(text).slice(0, 2000);
+  }
+
+  return null;
+}
+
 /** Eventos-marco garantidos pelo runner (não dependem do formato exato da saída do claude). */
 export function startEvent(runId: string, skill: string): AgentEventRow {
   return row(runId, 'skill', 'start', { source: 'runner' }, null, skill);

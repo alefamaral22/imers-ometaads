@@ -4,6 +4,9 @@
 // claim_agent_job (FOR UPDATE SKIP LOCKED) no banco.
 
 import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import process from 'node:process';
 import { assertSafeArgs, validateSkillName } from './domain/skill.ts';
 import { finishedPatch, runningPatch } from './domain/job.ts';
@@ -74,6 +77,43 @@ async function resolveTenantKeyEnv(
   return { ok: true, overrides };
 }
 
+function rmIfExists(p: string): void {
+  try {
+    if (existsSync(p)) unlinkSync(p);
+  } catch {
+    // best-effort: limpeza do arquivo de diagnóstico nunca derruba o poller
+  }
+}
+
+/**
+ * Monta a mensagem de erro do job (ETAPA 1 "nunca silêncio"): prioriza o erro ESTRUTURADO do claude
+ * (linha `result` capturada pelo emit-from-stream no sidecar), cai para o tail do stderr (refusas de
+ * startup como sandbox, que não saem no stream) e, por fim, o erro de spawn. Nunca lança.
+ */
+function resolveJobError(
+  errorFile: string,
+  stderr: string | null | undefined,
+  spawnError: string | undefined,
+): string | undefined {
+  try {
+    if (existsSync(errorFile)) {
+      const txt = readFileSync(errorFile, 'utf8').trim();
+      if (txt.length > 0) return txt.slice(0, 2000);
+    }
+  } catch {
+    // best-effort
+  }
+  const tail = (stderr ?? '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .slice(-12)
+    .join('\n')
+    .trim();
+  if (tail.length > 0) return tail.slice(0, 2000);
+  return spawnError;
+}
+
 function emit(cfg: RunnerConfig, row: Parameters<typeof insertAgentEvent>[1]): Promise<void> {
   return insertAgentEvent(cfg, row).catch((err: unknown) => {
     process.stderr.write(`telemetry: ${err instanceof Error ? err.message : String(err)}\n`);
@@ -118,23 +158,33 @@ async function main(): Promise<void> {
   // Executa a skill via run-skill.sh (que faz claude -p stream-json | emit-from-stream).
   // AGENT_RUN_ID liga a telemetria do stream ao job; AGENT_ARGS passa os args já validados.
   // keyEnv.overrides injeta as chaves do tenant (ou {} para super_admin) — nunca logadas.
+  // Captura o erro real do claude para diagnóstico/feedback (ETAPA 1 "nunca silêncio"):
+  // RUNNER_ERROR_FILE recebe a mensagem da linha `result`/`error` do stream (via emit-from-stream);
+  // o stderr é capturado para pegar refusas de startup do claude que não saem no stream.
+  const errorFile = join(tmpdir(), `runner-err-${job.id}.txt`);
+  rmIfExists(errorFile);
+
   const result = spawnSync('bash', ['scripts/run-skill.sh', job.skill], {
-    stdio: 'inherit',
+    // stdout segue ao vivo para o log do cron; só o stderr é capturado para virar agent_jobs.error.
+    stdio: ['inherit', 'inherit', 'pipe'],
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
     env: {
       ...process.env,
       AGENT_RUN_ID: job.id,
       AGENT_ARGS: JSON.stringify(safeArgs),
+      RUNNER_ERROR_FILE: errorFile,
       ...keyEnv.overrides,
     },
   });
+  if (result.stderr) process.stderr.write(result.stderr);
   const exitCode = result.status ?? 1;
+  const errorMessage =
+    exitCode === 0 ? undefined : resolveJobError(errorFile, result.stderr, result.error?.message);
+  rmIfExists(errorFile);
 
   await emit(cfg, endEvent(job.id, job.skill, exitCode));
-  await patchAgentJob(
-    cfg,
-    job.id,
-    finishedPatch(exitCode, new Date().toISOString(), result.error?.message),
-  );
+  await patchAgentJob(cfg, job.id, finishedPatch(exitCode, new Date().toISOString(), errorMessage));
   process.stdout.write(`job ${job.id} -> ${exitCode === 0 ? 'completed' : 'failed'}\n`);
 }
 
