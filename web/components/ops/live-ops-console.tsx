@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
-import { ArcReactor } from './arc-reactor';
 import { StatusBars } from './status-bars';
-import { SpeakingOrb } from '../nexus/speaking-orb';
+import { VoiceOrb } from '../nexus/voice-orb/voice-orb';
 import { useNexusChat } from '../nexus/use-nexus-chat';
 import { MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
 import { formatCents, formatInteger } from '../../lib/domain/format';
@@ -176,16 +175,13 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           className="relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-edge/40 bg-panel/20 p-6"
         >
-          {/* backdrop: malha radial + respiração ciano sob o reactor */}
+          {/* backdrop: só a respiração ciano sob o reactor (sem grade — o foco é o globo neural) */}
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-60"
+            className="pointer-events-none absolute inset-0 opacity-70"
             style={{
               backgroundImage:
-                'radial-gradient(circle at 50% 50%, rgba(56,230,255,0.08), transparent 60%), radial-gradient(rgba(56,230,255,0.05) 1px, transparent 1px)',
-              backgroundSize: '100% 100%, 26px 26px',
-              maskImage: 'radial-gradient(circle at 50% 50%, #000 30%, transparent 75%)',
-              WebkitMaskImage: 'radial-gradient(circle at 50% 50%, #000 30%, transparent 75%)',
+                'radial-gradient(circle at 50% 50%, rgba(56,230,255,0.10), transparent 62%)',
             }}
           />
           <CornerBrackets />
@@ -196,7 +192,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
             <span className={`h-1.5 w-1.5 rounded-full ${working || speaking ? 'bg-accent' : 'bg-dim'}`} />
             {working || speaking ? 'live' : 'idle'}
           </span>
-          <ArcReactor working={working} speaking={speaking} />
+          <VoiceOrb size="lg" state={nexus.orbState} levelRef={nexus.levelRef} busy={working} />
           <p className="relative z-10 mt-4 text-center text-[11px] tracking-[0.25em] text-dim uppercase">
             {working
               ? 'Núcleo aquecido — agentes processando'
@@ -231,7 +227,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
 
           {/* visualizador circular que pulsa quando o Nexus fala */}
           <div className="flex items-center justify-center border-b border-edge/50 py-4">
-            <SpeakingOrb speaking={speaking} active={nexus.active} />
+            <VoiceOrb size="sm" state={nexus.orbState} levelRef={nexus.levelRef} px={112} />
           </div>
 
           {/* chat */}

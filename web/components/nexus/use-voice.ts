@@ -8,6 +8,7 @@ import {
   vadStep,
   type VadState,
 } from '../../lib/nexus/domain/vad';
+import { createAudioMeter, normalizeLevel, type AudioMeter } from './voice-orb/audio-meter';
 
 /**
  * Hook de voz do Nexus (client). Dois modos:
@@ -28,6 +29,8 @@ export interface UseVoice {
   listening: boolean;
   /** Nexus falando agora (TTS tocando). */
   speaking: boolean;
+  /** Nível de áudio ao vivo 0..1 (mic do usuário ou voz da IA) para os visualizadores. Sem re-render. */
+  levelRef: { current: number };
   startRecording: () => Promise<void>;
   stopAndTranscribe: () => Promise<string | null>;
   /** Liga o modo mãos-livres; chama `onUtterance(audioBlob)` ao fim de cada fala detectada. */
@@ -68,6 +71,15 @@ export function useVoice(): UseVoice {
   const pausedRef = useRef(false);
   const speakingRef = useRef(false);
 
+  // Medidor de áudio para os visualizadores (mic + TTS) → levelRef 0..1, lido por frame pelo orbe.
+  const levelRef = useRef(0);
+  const meterRef = useRef<AudioMeter | null>(null);
+  const meterDetachRef = useRef<(() => void) | null>(null);
+  const getMeter = useCallback((): AudioMeter => {
+    if (!meterRef.current) meterRef.current = createAudioMeter(levelRef);
+    return meterRef.current;
+  }, []);
+
   const supported =
     typeof window !== 'undefined' &&
     typeof navigator !== 'undefined' &&
@@ -97,6 +109,7 @@ export function useVoice(): UseVoice {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     streamRef.current = stream;
     chunksRef.current = [];
+    meterDetachRef.current = getMeter().meterStream(stream); // alimenta o orbe enquanto grava
     const recorder = new MediaRecorder(stream);
     recorder.ondataavailable = (e: BlobEvent) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -113,6 +126,9 @@ export function useVoice(): UseVoice {
       recorder.onstop = () => resolve(new Blob(chunksRef.current, { type: 'audio/webm' }));
       recorder.stop();
     });
+    meterDetachRef.current?.();
+    meterDetachRef.current = null;
+    levelRef.current = 0;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     recorderRef.current = null;
     streamRef.current = null;
@@ -157,12 +173,15 @@ export function useVoice(): UseVoice {
       if (hfRecorderRef.current) void stopSegment(true);
       vadStateRef.current = initVadState();
       setListening(false);
+      // Enquanto a IA fala, o orbe é dirigido pelo medidor do TTS; só zeramos fora disso.
+      if (!speakingRef.current) levelRef.current = 0;
       return;
     }
     setListening(true);
 
     analyser.getByteTimeDomainData(buf);
     const level = rmsFromTimeDomain(buf);
+    levelRef.current = normalizeLevel(level); // alimenta o orbe com a voz do usuário
     const { state, event } = vadStep(
       vadStateRef.current,
       { level, tMs: performance.now() },
@@ -226,6 +245,7 @@ export function useVoice(): UseVoice {
     timeBufRef.current = null;
     onUtteranceRef.current = null;
     vadStateRef.current = initVadState();
+    levelRef.current = 0;
     setHandsFree(false);
     setListening(false);
   }, []);
@@ -246,6 +266,11 @@ export function useVoice(): UseVoice {
       const buf = await res.arrayBuffer();
       const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
       const audio = new Audio(url);
+      // Mede o nível da voz da IA para o orbe — mas SÓ se o contexto está tocando; senão deixa o áudio
+      // sair pelo caminho normal (rotear por Web Audio com contexto suspenso mutaria o TTS).
+      let detachMeter: (() => void) | null = null;
+      const meter = getMeter();
+      if (await meter.resume()) detachMeter = meter.meterElement(audio);
       speakingRef.current = true;
       setSpeaking(true);
       // Resolve só quando o áudio TERMINA (necessário para o loop de mãos-livres retomar a escuta).
@@ -258,16 +283,25 @@ export function useVoice(): UseVoice {
         audio.onerror = done;
         audio.play().catch(done);
       });
+      detachMeter?.();
     } catch {
       // silencioso: voz é um plus, o texto já foi mostrado
     } finally {
+      levelRef.current = 0;
       speakingRef.current = false;
       setSpeaking(false);
     }
-  }, []);
+  }, [getMeter]);
 
   // Limpeza ao desmontar (evita mic/AudioContext vazando).
-  useEffect(() => () => stopHandsFree(), [stopHandsFree]);
+  useEffect(
+    () => () => {
+      stopHandsFree();
+      meterRef.current?.dispose();
+      meterRef.current = null;
+    },
+    [stopHandsFree],
+  );
 
   return {
     supported,
@@ -276,6 +310,7 @@ export function useVoice(): UseVoice {
     handsFree,
     listening,
     speaking,
+    levelRef,
     startRecording,
     stopAndTranscribe,
     startHandsFree,

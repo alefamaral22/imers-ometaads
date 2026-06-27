@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { SpeakingOrb } from './speaking-orb';
+import { VoiceOrb } from './voice-orb/voice-orb';
 import { useNexusChat } from './use-nexus-chat';
 import { MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
 
@@ -32,6 +32,8 @@ export function NexusWidget() {
     hfStatus,
     speaking,
     active,
+    orbState,
+    levelRef,
   } = useNexusChat();
 
   // Rola para a última mensagem.
@@ -123,7 +125,7 @@ export function NexusWidget() {
             backgroundImage: 'radial-gradient(circle at 50% 60%, rgba(56,230,255,0.08), transparent 60%)',
           }}
         />
-        <SpeakingOrb speaking={speaking} active={active} size={84} />
+        <VoiceOrb size="sm" state={orbState} levelRef={levelRef} px={84} />
       </div>
 
       {voice.supported ? (

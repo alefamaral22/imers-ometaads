@@ -240,6 +240,12 @@ export function useNexusChat() {
   // Sinais agregados para os visualizadores (barras/reactor): "falando" e "ativo".
   const speaking = voice.speaking;
   const active = voice.recording || voice.listening || voice.speaking || loading;
+  // Estado do VoiceOrb: a IA falando manda; senão captação do usuário; senão repouso.
+  const orbState: 'idle' | 'listening' | 'speaking' = speaking
+    ? 'speaking'
+    : voice.recording || voice.listening
+      ? 'listening'
+      : 'idle';
 
   return {
     messages,
@@ -258,6 +264,8 @@ export function useNexusChat() {
     hfStatus,
     speaking,
     active,
+    orbState,
+    levelRef: voice.levelRef,
   };
 }
 
