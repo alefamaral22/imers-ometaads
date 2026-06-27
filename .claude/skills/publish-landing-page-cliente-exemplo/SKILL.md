@@ -40,7 +40,10 @@ Skill **headless** que **serializa do banco → builda → publica**. Conteúdo 
    ```
 
    (gera `content-spec.json` + `messages/pt.json` + `theme.css`).
-4. **Build estático** — `( cd landing-pages/_template && npm run build )` (Next.js `output:export` → `out/`).
+4. **Build estático** — `( cd landing-pages/_template && npm run build:ci )` (Next.js `output:export` →
+   `out/`). Rode em **UMA chamada Bash síncrona** e **AGUARDE terminar** — NÃO lance em segundo plano e
+   NÃO relance em paralelo se demorar (duas builds simultâneas corrompem o `.next`). O script `build:ci`
+   já limpa `.next`/`out` antes e capa o heap do Node (memória do VM); se falhar, **aborte** sem deploy.
 5. **Deploy** — `npx wrangler pages deploy landing-pages/_template/out --project-name
    cliente-exemplo-<subdomain>` (cria/atualiza o projeto Pages; idempotente). Capture a URL.
 6. **Patch** — `upsertRow('landing_pages', { subdomain, ...publishPatch({url, fqdn, snapshot}) },

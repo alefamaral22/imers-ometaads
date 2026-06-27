@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:ci": "rm -rf .next out && NODE_OPTIONS=--max-old-space-size=896 next build",
     "start": "next start",
     "serialize": "tsx ../../packages/lp-render/src/serializer/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

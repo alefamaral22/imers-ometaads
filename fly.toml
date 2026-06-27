@@ -3,6 +3,11 @@
 app = "imers-ometaads"
 primary_region = "gru"
 
+# Swap em disco (grátis) dá folga de memória ao `next build` da skill de publish-landing no VM de
+# 1 GB — sem ele o build estoura/lentifica e o headless reinicia, corrompendo o `.next`. Ver
+# landing-pages/_template (script build:ci capa o heap) e a gotcha da publish-landing.
+swap_size_mb = 1024
+
 [build]
   dockerfile = "Dockerfile"
 
