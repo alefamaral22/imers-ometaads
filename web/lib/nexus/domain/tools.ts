@@ -51,6 +51,19 @@ export const READ_TOOLS: NexusToolDef[] = [
     description: 'Retorna o funil de 7 etapas da análise mais recente (contagens e CVR por etapa).',
     input_schema: { type: 'object', properties: {} },
   },
+  {
+    name: 'get_job_status',
+    description:
+      'Verifica o ANDAMENTO dos pedidos recentes (criar/publicar landing page, criar campanha, ' +
+      'análise): se está na fila, processando, pronto, ou se falhou (com o MOTIVO real). Use SEMPRE ' +
+      'que o operador perguntar "ficou pronta?", "já foi?", "deu certo a landing?", "cadê minha ' +
+      'página?", e logo depois de pedir uma criação, para informar o andamento e o link quando pronto. ' +
+      'Opcional: client_slug.',
+    input_schema: {
+      type: 'object',
+      properties: { client_slug: { type: 'string', description: 'slug do cliente (opcional)' } },
+    },
+  },
 ];
 
 // Tool de escrita — NÃO age: enfileira via slug, com confirmação em dois turnos.

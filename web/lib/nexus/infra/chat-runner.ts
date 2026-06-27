@@ -21,6 +21,7 @@ import {
   listFunnelEvents,
 } from '../../services/analyses';
 import { getLatestSnapshot } from '../../services/live-snapshots';
+import { getRecentJobs, getLatestLanding } from '../../services/jobs';
 import { AGENCY_SCOPE } from '../../multitenant/scope';
 
 // Cliente default do template quando o operador não nomeia um (há só um cadastrado).
@@ -80,6 +81,17 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
     return JSON.stringify(
       latest ? { analysis: latest, events: await listFunnelEvents(latest.id) } : null,
     );
+  }
+  if (name === 'get_job_status') {
+    // Andamento dos pedidos recentes + estado da landing — para o Nexus narrar status/erro/link.
+    const clientId = clientSlug
+      ? ((await getClientBySlug(AGENCY_SCOPE, clientSlug))?.id ?? undefined)
+      : undefined;
+    const [jobs, landing] = await Promise.all([
+      getRecentJobs(AGENCY_SCOPE, { clientId, limit: 6 }),
+      getLatestLanding(AGENCY_SCOPE, clientId),
+    ]);
+    return JSON.stringify({ jobs, landing });
   }
   if (name === 'get_live_snapshot') {
     // Lê o raio-x já PRONTO do banco (read-only). Filtra por cliente quando dado; senão o mais recente.
