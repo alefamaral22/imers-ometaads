@@ -49,6 +49,20 @@ export const editSectionSchema = z.object({
 
 export type EditSectionInput = z.infer<typeof editSectionSchema>;
 
+// Slug canônico (cliente/produto/subdomínio): minúsculas, dígitos e hífen entre segmentos. Charset
+// estreito de propósito — o valor vai virar arg de um job (entrada externa é DADO, não instrução).
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+// Pedido (operador) de criação de uma landing page a partir da aba. Só enfileira o job de criação
+// (escrita = só enfileira); a skill headless faz o trabalho. client_slug é obrigatório; o resto opcional.
+export const createLandingSchema = z.object({
+  client_slug: z.string().min(1).max(80).regex(SLUG_RE, 'slug inválido'),
+  product_slug: z.string().min(1).max(80).regex(SLUG_RE, 'slug inválido').optional(),
+  subdomain: z.string().min(1).max(63).regex(SLUG_RE, 'subdomínio inválido').optional(),
+});
+
+export type CreateLandingInput = z.infer<typeof createLandingSchema>;
+
 export const startWatchSchema = z.object({
   target_kind: z.enum(['agent_job', 'landing_page']),
   target_id: z.string().uuid(),

@@ -34,8 +34,9 @@ import { runChatTurn, confirmAndEnqueue } from '../../../lib/nexus/infra/chat-ru
 import { transcribe, synthesize } from '../../../lib/nexus/infra/voice';
 import { describeScreen } from '../../../lib/nexus/infra/vision';
 import { NexusUnavailableError } from '../../../lib/nexus/infra/anthropic';
-import { editSectionSchema, startWatchSchema } from '../../../lib/landing/edit';
+import { createLandingSchema, editSectionSchema, startWatchSchema } from '../../../lib/landing/edit';
 import { editSection } from '../../../lib/services/landing-sections';
+import { enqueueCreateLandingJob } from '../../../lib/services/landing-jobs';
 import { startWatch } from '../../../lib/services/watches';
 import { isSecretsVaultEnabled } from '../../../lib/env';
 import {
@@ -425,6 +426,19 @@ app.post('/landing/section', async (c) => {
     return c.json({ error: outcome.reason }, outcome.reason === 'not_found' ? 404 : 409);
   }
   return c.json({ ok: true, version: outcome.version });
+});
+
+// Pedido de criação de landing page pela aba (escrita = só enfileira). O middleware /landing/* já
+// garantiu auth + super_admin/socio; aqui validamos a entrada e enfileiramos o job (slug resolvido
+// pela allowlist server-side, nunca texto livre). 201 com o status da fila (enqueued/already_active).
+app.post('/landing/create', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createLandingSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const result = await enqueueCreateLandingJob(scopeFromClaims(claims), parsed.data);
+  return c.json({ ok: true, status: result.status, jobId: result.jobId }, 201);
 });
 
 // Inicia o modo autônomo (cria autonomous_watches; o runner avança por tick).

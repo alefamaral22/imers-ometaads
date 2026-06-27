@@ -1,8 +1,11 @@
+import Link from 'next/link';
 import { requireOperator } from '../../lib/auth/server';
 import { scopeFromClaims } from '../../lib/multitenant/scope';
 import { listLandingPages } from '../../lib/services/landing-pages';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
+import { CreateLandingForm } from '../../components/landing/create-landing-form';
+import { CopyLink } from '../../components/landing/copy-link';
 import { formatCents, formatDate } from '../../lib/domain/format';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +27,8 @@ export default async function LandingPagesPage() {
         title="Landing pages"
         subtitle="Páginas geradas e publicadas. Rascunhos nascem noindex (preview)."
       />
+      <CreateLandingForm />
+
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
       {!error && pages.length === 0 ? <EmptyState>Nenhuma landing page ainda.</EmptyState> : null}
 
@@ -34,6 +39,7 @@ export default async function LandingPagesPage() {
               <Th>Subdomínio</Th>
               <Th>Status</Th>
               <Th>Rascunho</Th>
+              <Th>Link</Th>
               <Th>Preço</Th>
               <Th>Carrinho</Th>
               <Th>Index</Th>
@@ -44,18 +50,16 @@ export default async function LandingPagesPage() {
             {pages.map((p) => (
               <tr key={p.id}>
                 <Td>
-                  {p.url ? (
-                    <a href={p.url} className="text-accent hover:underline">
-                      {p.subdomain}
-                    </a>
-                  ) : (
-                    p.subdomain
-                  )}
+                  {/* O subdomínio leva ao EDITOR (rascunho); o link ao vivo fica na coluna "Link". */}
+                  <Link href={`/landing-pages/${p.id}`} className="text-accent hover:underline">
+                    {p.subdomain}
+                  </Link>
                 </Td>
                 <Td>
                   <Badge value={p.status} />
                 </Td>
                 <Td>{p.draft_status}</Td>
+                <Td>{p.url ? <CopyLink url={p.url} /> : <span className="text-dim">—</span>}</Td>
                 <Td>{formatCents(p.price_cents)}</Td>
                 <Td>{p.cart_state}</Td>
                 <Td>{p.noindex ? 'noindex' : 'indexável'}</Td>

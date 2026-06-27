@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applyEditPath, editSectionSchema, nextVersion, reconcile } from './edit';
+import {
+  applyEditPath,
+  createLandingSchema,
+  editSectionSchema,
+  nextVersion,
+  reconcile,
+} from './edit';
 
 describe('reconcile (optimistic concurrency)', () => {
   it('accepts a matching version and rejects a stale one', () => {
@@ -25,6 +31,28 @@ describe('applyEditPath', () => {
   it('rejects prototype-pollution segments', () => {
     expect(() => applyEditPath({}, '__proto__.polluted', true)).toThrow();
     expect(() => applyEditPath({}, 'constructor', 'x')).toThrow();
+  });
+});
+
+describe('createLandingSchema', () => {
+  it('accepts client_slug alone and with optional product/subdomain', () => {
+    expect(createLandingSchema.safeParse({ client_slug: 'cliente-exemplo' }).success).toBe(true);
+    expect(
+      createLandingSchema.safeParse({
+        client_slug: 'cliente-exemplo',
+        product_slug: 'curso-exemplo',
+        subdomain: 'oferta',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects missing client_slug and unsafe charset', () => {
+    expect(createLandingSchema.safeParse({}).success).toBe(false);
+    expect(createLandingSchema.safeParse({ client_slug: 'Cliente Exemplo' }).success).toBe(false);
+    expect(createLandingSchema.safeParse({ client_slug: 'a; rm -rf /' }).success).toBe(false);
+    expect(
+      createLandingSchema.safeParse({ client_slug: 'ok', subdomain: 'bad_subdomain' }).success,
+    ).toBe(false);
   });
 });
 
