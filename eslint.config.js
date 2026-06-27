@@ -13,6 +13,10 @@ export default tseslint.config(
       '**/out/**',
       '**/.wrangler/**',
       'coverage/**',
+      // Skills vendorizadas (toolkits de design de terceiros: impeccable, frontend-design,
+      // theme-factory, ui-ux-pro-max). Têm seu próprio estilo/runtime; não são código do projeto.
+      '.claude/skills/**',
+      '.github/skills/**',
     ],
   },
   js.configs.recommended,
