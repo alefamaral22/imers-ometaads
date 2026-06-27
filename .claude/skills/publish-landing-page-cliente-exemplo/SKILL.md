@@ -1,7 +1,7 @@
 ---
 name: publish-landing-page-cliente-exemplo
 description: Publica uma landing page do cliente-exemplo em preview — serializa o ContentDoc do banco (@template/lp-render) para o template, roda next build (static export) e faz wrangler deploy no Cloudflare Pages em <subdomain>.example.com. Patcha landing_pages (deployed). Headless e idempotente.
-allowed-tools: Read, Write, Glob, Bash(npx tsx:*), Bash(npm:*), Bash(npx wrangler:*), Bash(sleep:*), Bash(tail:*), Bash(cat:*), Bash(ls:*)
+allowed-tools: Read, Write, Glob, Bash(npx tsx:*), Bash(bash scripts/publish-lp.sh:*), Bash(sleep:*), Bash(tail:*), Bash(cat:*), Bash(ls:*)
 ---
 
 # publish-landing-page-cliente-exemplo
@@ -40,18 +40,21 @@ Skill **headless** que **serializa do banco → builda → publica**. Conteúdo 
    ```
 
    (gera `content-spec.json` + `messages/pt.json` + `theme.css`).
-4. **Build estático** — `( cd landing-pages/_template && npm run build:ci )` (Next.js `output:export` →
-   `out/`). Rode em **UMA chamada Bash síncrona** e **AGUARDE terminar** — NÃO lance em segundo plano e
-   NÃO relance em paralelo se demorar (duas builds simultâneas corrompem o `.next`). O script `build:ci`
-   já limpa `.next`/`out` antes e capa o heap do Node (memória do VM); se falhar, **aborte** sem deploy.
-   (O runner headless executa comandos longos como tarefa de fundo e faz polling com `sleep`/`tail` —
-   por isso eles estão no `allowed-tools`; sem isso o build "compila" mas a skill trava sem confirmar.)
-5. **Deploy** — `npx wrangler pages deploy landing-pages/_template/out --project-name
-   cliente-exemplo-<subdomain>` (cria/atualiza o projeto Pages; idempotente). Capture a URL.
-6. **Patch** — `upsertRow('landing_pages', { subdomain, ...publishPatch({url, fqdn, snapshot}) },
-   'subdomain')`: `status='deployed'`, `url`, `ssl_status`, `published_snapshot`. `operation_logs`
-   (`action='update'`, `actor='skill'`).
-7. **Manifest** — `tentativas-geracao-de-campanhas/<stamp>-landing-publish.json` (`buildPublishManifest`).
+4. **Build + deploy (uma chamada bloqueante)** — rode **exatamente**:
+
+   ```bash
+   bash scripts/publish-lp.sh <SUBDOMAIN>
+   ```
+
+   O script builda o export estático (limpa `.next`/`out`, capa o heap) **e** faz `wrangler pages
+   deploy` no Cloudflare Pages, tudo numa execução bloqueante. **AGUARDE o comando RETORNAR** — não o
+   lance em segundo plano, não emita nenhuma mensagem nem rode outro comando até ele terminar (o passo
+   é lento; se você responder no meio, o loop encerra antes do deploy = falso-verde). Ao final ele
+   imprime `PUBLISH_LP_URL=<url>` — **capture essa URL**. Se o comando sair ≠ 0, **aborte** sem patch.
+5. **Patch** — `upsertRow('landing_pages', { subdomain, ...publishPatch({url, fqdn, snapshot}) },
+   'subdomain')` usando a `url` capturada: `status='deployed'`, `url`, `ssl_status`,
+   `published_snapshot`. `operation_logs` (`action='update'`, `actor='skill'`).
+6. **Manifest** — `tentativas-geracao-de-campanhas/<stamp>-landing-publish.json` (`buildPublishManifest`).
 
 ## Critérios de aceite
 
