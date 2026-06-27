@@ -25,4 +25,12 @@ describe('parseJobArgs', () => {
   it('rejects overly long values', () => {
     expect(() => parseJobArgs({ client_slug: 'a'.repeat(201) })).toThrow();
   });
+
+  it('accepts inputs_token (UUID) na allowlist', () => {
+    const token = '11111111-2222-3333-4444-555555555555';
+    expect(parseJobArgs({ client_slug: 'x', inputs_token: token })).toEqual({
+      client_slug: 'x',
+      inputs_token: token,
+    });
+  });
 });

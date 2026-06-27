@@ -34,9 +34,15 @@ import { runChatTurn, confirmAndEnqueue } from '../../../lib/nexus/infra/chat-ru
 import { transcribe, synthesize } from '../../../lib/nexus/infra/voice';
 import { describeScreen } from '../../../lib/nexus/infra/vision';
 import { NexusUnavailableError } from '../../../lib/nexus/infra/anthropic';
-import { createLandingSchema, editSectionSchema, startWatchSchema } from '../../../lib/landing/edit';
+import {
+  createLandingSchema,
+  editSectionSchema,
+  startWatchSchema,
+} from '../../../lib/landing/edit';
 import { editSection } from '../../../lib/services/landing-sections';
 import { enqueueCreateLandingJob } from '../../../lib/services/landing-jobs';
+import { storeLandingInputs } from '../../../lib/services/landing-inputs';
+import { landingInputsCopySchema, MAX_IMAGES } from '../../../lib/landing/inputs';
 import { startWatch } from '../../../lib/services/watches';
 import { isSecretsVaultEnabled } from '../../../lib/env';
 import {
@@ -439,6 +445,36 @@ app.post('/landing/create', async (c) => {
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
   const result = await enqueueCreateLandingJob(scopeFromClaims(claims), parsed.data);
   return c.json({ ok: true, status: result.status, jobId: result.jobId }, 201);
+});
+
+// Inputs OPCIONAIS da geração de LP (imagens enviadas + copy escrita à mão). Multipart. Guarda no
+// Storage e devolve um `inputs_token` que o operador anexa ao /landing/create. Entrada externa é
+// DADO: MIME/tamanho/quantidade validados aqui e no service; copy validada por schema. O middleware
+// /landing/* já garantiu auth + super_admin/socio.
+app.post('/landing/inputs', async (c) => {
+  const form = await c.req.formData().catch(() => null);
+  if (form === null) return c.json({ error: 'invalid_request' }, 400);
+
+  const images = form.getAll('images').filter((v): v is File => v instanceof File && v.size > 0);
+  if (images.length > MAX_IMAGES) return c.json({ error: 'too_many_images' }, 400);
+
+  // Campos de copy: só os presentes/não-vazios entram (ausência = a IA gera).
+  const rawCopy: Record<string, string> = {};
+  for (const k of ['headline', 'subheadline', 'ctaLabel', 'notes'] as const) {
+    const v = form.get(k);
+    if (typeof v === 'string' && v.trim().length > 0) rawCopy[k] = v.trim();
+  }
+  const parsedCopy = landingInputsCopySchema.safeParse(rawCopy);
+  if (!parsedCopy.success) return c.json({ error: 'invalid_request' }, 400);
+  const copy = Object.keys(parsedCopy.data).length > 0 ? parsedCopy.data : undefined;
+
+  if (images.length === 0 && copy === undefined) {
+    return c.json({ error: 'nothing_to_store' }, 400);
+  }
+
+  const outcome = await storeLandingInputs({ images, copy });
+  if ('rejected' in outcome) return c.json({ error: outcome.reason }, 400);
+  return c.json({ ok: true, inputs_token: outcome.inputsToken, images: outcome.imageUrls }, 201);
 });
 
 // Inicia o modo autônomo (cria autonomous_watches; o runner avança por tick).

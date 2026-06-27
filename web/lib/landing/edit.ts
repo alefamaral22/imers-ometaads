@@ -59,6 +59,8 @@ export const createLandingSchema = z.object({
   client_slug: z.string().min(1).max(80).regex(SLUG_RE, 'slug inválido'),
   product_slug: z.string().min(1).max(80).regex(SLUG_RE, 'slug inválido').optional(),
   subdomain: z.string().min(1).max(63).regex(SLUG_RE, 'subdomínio inválido').optional(),
+  // Token (UUID) dos inputs opcionais (imagens/copy) já guardados no Storage. A skill lê o manifesto.
+  inputs_token: z.string().uuid().optional(),
 });
 
 export type CreateLandingInput = z.infer<typeof createLandingSchema>;

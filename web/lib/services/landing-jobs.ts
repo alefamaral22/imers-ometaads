@@ -20,6 +20,7 @@ export async function enqueueCreateLandingJob(
   const args: Record<string, string> = { client_slug: input.client_slug };
   if (input.product_slug) args.product_slug = input.product_slug;
   if (input.subdomain) args.subdomain = input.subdomain;
+  if (input.inputs_token) args.inputs_token = input.inputs_token;
 
   const pending = buildPendingAction('create-landing', args, {
     id: globalThis.crypto.randomUUID(),

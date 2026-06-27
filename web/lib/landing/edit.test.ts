@@ -54,6 +54,18 @@ describe('createLandingSchema', () => {
       createLandingSchema.safeParse({ client_slug: 'ok', subdomain: 'bad_subdomain' }).success,
     ).toBe(false);
   });
+
+  it('accepts an optional inputs_token (UUID) and rejects a non-UUID', () => {
+    expect(
+      createLandingSchema.safeParse({
+        client_slug: 'ok',
+        inputs_token: '11111111-2222-3333-4444-555555555555',
+      }).success,
+    ).toBe(true);
+    expect(
+      createLandingSchema.safeParse({ client_slug: 'ok', inputs_token: 'not-a-uuid' }).success,
+    ).toBe(false);
+  });
 });
 
 describe('editSectionSchema', () => {

@@ -80,6 +80,7 @@ interface HeroFields {
   subheadline?: string;
   cta: Cta;
   secondaryCta?: Cta;
+  image?: string;
 }
 interface LogosFields {
   title?: string;
@@ -92,6 +93,7 @@ interface ProblemFields {
 interface SolutionFields {
   headline: string;
   body: string;
+  image?: string;
 }
 interface FeaturesFields {
   headline: string;
@@ -107,11 +109,12 @@ interface HowItWorksFields {
 }
 interface TestimonialsFields {
   headline?: string;
-  testimonials: { quote: string; author: string; role?: string }[];
+  testimonials: { quote: string; author: string; role?: string; avatar?: string }[];
 }
 interface VideoFields {
   headline?: string;
   embedUrl: string;
+  poster?: string;
 }
 interface PricingFields {
   headline: string;
@@ -138,10 +141,12 @@ interface FaqFields {
 interface GuaranteeFields {
   headline: string;
   body: string;
+  badge?: string;
 }
 interface AboutFields {
   headline: string;
   body: string;
+  image?: string;
 }
 interface LeadFormFields {
   headline: string;
@@ -175,6 +180,11 @@ function Hero(f: HeroFields, ctx: PageCtx): ReactElement {
             <CtaButton cta={f.secondaryCta} ctx={ctx} variant="secondary" />
           )}
         </div>
+        {f.image !== undefined && (
+          <figure className="hero-media">
+            <img src={f.image} alt="" loading="eager" />
+          </figure>
+        )}
       </div>
     </section>
   );
@@ -213,15 +223,46 @@ function Problem(f: ProblemFields): ReactElement {
   );
 }
 
-function Solution(f: SolutionFields): ReactElement {
+// Text + optional image become a two-column split (image right); without an image it's a plain
+// single column. Shared by solution/about so the media treatment is consistent.
+function MediaSplit({
+  sectionClass,
+  headline,
+  body,
+  image,
+}: {
+  sectionClass: string;
+  headline: string;
+  body: string;
+  image?: string | undefined;
+}): ReactElement {
+  if (image === undefined) {
+    return (
+      <section className={`section ${sectionClass}`}>
+        <div className="container">
+          <h2>{headline}</h2>
+          <p>{body}</p>
+        </div>
+      </section>
+    );
+  }
   return (
-    <section className="section solution">
-      <div className="container">
-        <h2>{f.headline}</h2>
-        <p>{f.body}</p>
+    <section className={`section ${sectionClass} has-media`}>
+      <div className="container media-split">
+        <div className="media-copy">
+          <h2>{headline}</h2>
+          <p>{body}</p>
+        </div>
+        <figure className="media-figure">
+          <img src={image} alt="" loading="lazy" />
+        </figure>
       </div>
     </section>
   );
+}
+
+function Solution(f: SolutionFields): ReactElement {
+  return <MediaSplit sectionClass="solution" headline={f.headline} body={f.body} image={f.image} />;
 }
 
 function Features(f: FeaturesFields): ReactElement {
@@ -289,8 +330,13 @@ function Testimonials(f: TestimonialsFields): ReactElement {
             <figure key={i} className="card">
               <blockquote>{t.quote}</blockquote>
               <figcaption>
-                <strong>{t.author}</strong>
-                {t.role !== undefined && <span className="muted"> · {t.role}</span>}
+                {t.avatar !== undefined && (
+                  <img src={t.avatar} alt="" className="avatar" loading="lazy" />
+                )}
+                <span>
+                  <strong>{t.author}</strong>
+                  {t.role !== undefined && <span className="muted"> · {t.role}</span>}
+                </span>
               </figcaption>
             </figure>
           ))}
@@ -395,6 +441,7 @@ function Guarantee(f: GuaranteeFields): ReactElement {
   return (
     <section className="section guarantee">
       <div className="container">
+        {f.badge !== undefined && <img src={f.badge} alt="" className="badge" loading="lazy" />}
         <h2>{f.headline}</h2>
         <p>{f.body}</p>
       </div>
@@ -403,14 +450,7 @@ function Guarantee(f: GuaranteeFields): ReactElement {
 }
 
 function About(f: AboutFields): ReactElement {
-  return (
-    <section className="section about">
-      <div className="container">
-        <h2>{f.headline}</h2>
-        <p>{f.body}</p>
-      </div>
-    </section>
-  );
+  return <MediaSplit sectionClass="about" headline={f.headline} body={f.body} image={f.image} />;
 }
 
 function LeadForm(f: LeadFormFields): ReactElement {
