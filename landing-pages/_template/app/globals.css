@@ -20,15 +20,26 @@
 
   /* Surfaces derived from the palette: a faint tint of the brand for alternating bands and a
      slightly raised card surface that reads against both light and dark backgrounds. */
-  --surface-tint: color-mix(in oklab, var(--color-primary, #4338ca) 4%, var(--color-background, #fff));
-  --surface-card: color-mix(in oklab, var(--color-foreground, #0b1120) 2%, var(--color-background, #fff));
+  --surface-tint: color-mix(
+    in oklab,
+    var(--color-primary, #4338ca) 4%,
+    var(--color-background, #fff)
+  );
+  --surface-card: color-mix(
+    in oklab,
+    var(--color-foreground, #0b1120) 2%,
+    var(--color-background, #fff)
+  );
   --hairline: color-mix(in oklab, var(--color-foreground, #0b1120) 9%, transparent);
 
   /* Shadows tinted toward ink for depth without the flat-gray look. */
   --shadow-sm: 0 1px 2px color-mix(in oklab, var(--color-foreground, #0b1120) 8%, transparent);
-  --shadow-md: 0 6px 20px -8px color-mix(in oklab, var(--color-foreground, #0b1120) 22%, transparent);
-  --shadow-lg: 0 24px 60px -24px color-mix(in oklab, var(--color-foreground, #0b1120) 32%, transparent);
-  --shadow-cta: 0 10px 24px -10px color-mix(in oklab, var(--color-primary, #4338ca) 55%, transparent);
+  --shadow-md: 0 6px 20px -8px
+    color-mix(in oklab, var(--color-foreground, #0b1120) 22%, transparent);
+  --shadow-lg: 0 24px 60px -24px
+    color-mix(in oklab, var(--color-foreground, #0b1120) 32%, transparent);
+  --shadow-cta: 0 10px 24px -10px
+    color-mix(in oklab, var(--color-primary, #4338ca) 55%, transparent);
 }
 
 *,
@@ -632,6 +643,87 @@ details p {
 
 .footer-links a:hover {
   color: var(--color-foreground, #0b1120);
+}
+
+/* ----------------------------------------------------------------------------------------------
+ * Media — uploaded images (hero showcase, solution/about split, testimonial avatars, guarantee
+ * badge). All optional; sections render text-only when no image is provided.
+ * -------------------------------------------------------------------------------------------- */
+.hero-media {
+  margin: var(--space-5) auto 0;
+  max-width: 52rem;
+  border-radius: calc(var(--radius, 14px) + 4px);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--hairline);
+}
+
+.hero-media img {
+  display: block;
+  width: 100%;
+}
+
+/* solution/about: text + image two-column split that collapses to one column on small screens. */
+.media-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(1.5rem, 1rem + 3vw, 4rem);
+  align-items: center;
+}
+
+.media-copy h2 {
+  max-width: 18ch;
+}
+
+.media-figure {
+  margin: 0;
+  border-radius: var(--radius, 14px);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--hairline);
+}
+
+.media-figure img {
+  display: block;
+  width: 100%;
+}
+
+/* Every other media section flips the image to the left for rhythm. */
+.section:nth-of-type(even) .media-figure {
+  order: -1;
+}
+
+@media (max-width: 720px) {
+  .media-split {
+    grid-template-columns: 1fr;
+  }
+  .section:nth-of-type(even) .media-figure {
+    order: 0;
+  }
+}
+
+.testimonials figcaption {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.guarantee {
+  text-align: center;
+}
+
+.guarantee .badge {
+  width: clamp(5rem, 12vw, 7rem);
+  height: auto;
+  margin: 0 auto 1rem;
 }
 
 /* ----------------------------------------------------------------------------------------------
