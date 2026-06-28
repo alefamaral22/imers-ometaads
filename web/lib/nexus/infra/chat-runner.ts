@@ -88,7 +88,7 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
       ? ((await getClientBySlug(AGENCY_SCOPE, clientSlug))?.id ?? undefined)
       : undefined;
     const [jobs, landing] = await Promise.all([
-      getRecentJobs(AGENCY_SCOPE, { clientId, limit: 6 }),
+      getRecentJobs(AGENCY_SCOPE, { ...(clientId !== undefined ? { clientId } : {}), limit: 6 }),
       getLatestLanding(AGENCY_SCOPE, clientId),
     ]);
     return JSON.stringify({ jobs, landing });
