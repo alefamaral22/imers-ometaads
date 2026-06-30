@@ -25,13 +25,28 @@ export function CreateLandingForm({
   const [subheadline, setSubheadline] = useState('');
   const [ctaLabel, setCtaLabel] = useState('');
   const [notes, setNotes] = useState('');
+  const [productName, setProductName] = useState('');
+  const [whatItSolves, setWhatItSolves] = useState('');
+  const [offer, setOffer] = useState('');
+  const [price, setPrice] = useState('');
+  const [ctaKind, setCtaKind] = useState<'whatsapp' | 'url' | 'checkout'>('whatsapp');
+  const [ctaValue, setCtaValue] = useState('');
   const [showOptional, setShowOptional] = useState(false);
+  const [showContext, setShowContext] = useState(false);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
 
   const hasCopy =
     headline.trim() || subheadline.trim() || ctaLabel.trim() || notes.trim() ? true : false;
-  const hasInputs = images.length > 0 || hasCopy;
+  const hasContext =
+    productName.trim() ||
+    whatItSolves.trim() ||
+    offer.trim() ||
+    price.trim() ||
+    ctaValue.trim()
+      ? true
+      : false;
+  const hasInputs = images.length > 0 || hasCopy || hasContext;
 
   // Sobe imagens/copy (se houver) e devolve o inputs_token, ou null se nada a anexar.
   async function uploadInputs(): Promise<string | null> {
@@ -42,6 +57,19 @@ export function CreateLandingForm({
     if (subheadline.trim()) fd.append('subheadline', subheadline.trim());
     if (ctaLabel.trim()) fd.append('ctaLabel', ctaLabel.trim());
     if (notes.trim()) fd.append('notes', notes.trim());
+    if (productName.trim()) fd.append('productName', productName.trim());
+    if (whatItSolves.trim()) fd.append('whatItSolves', whatItSolves.trim());
+    if (offer.trim()) fd.append('offer', offer.trim());
+    // Preço digitado em reais (ex.: 197 ou 197,50) → centavos inteiros (SPEC: dinheiro em centavos).
+    if (price.trim()) {
+      const cents = priceToCents(price);
+      if (cents === null) throw new Error('Preço inválido — use apenas números (ex.: 197 ou 197,50).');
+      fd.append('priceCents', String(cents));
+    }
+    if (ctaValue.trim()) {
+      fd.append('ctaKind', ctaKind);
+      fd.append('ctaValue', ctaValue.trim());
+    }
     const res = await fetch('/api/landing/inputs', { method: 'POST', body: fd });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -201,6 +229,84 @@ export function CreateLandingForm({
         ) : null}
 
         <button
+          type="button"
+          onClick={() => setShowContext((v) => !v)}
+          className="self-start text-[10px] tracking-wider text-accent/70 uppercase hover:text-accent"
+        >
+          {showContext ? '▾' : '▸'} Contexto do produto (opcional)
+        </button>
+
+        {showContext ? (
+          <div className="flex flex-col gap-3 rounded-md border border-edge/40 bg-bg/30 p-4">
+            <div className="flex flex-wrap gap-3">
+              <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
+                Nome do produto (opcional)
+                <input
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="Curso Exemplo"
+                  className={`w-64 ${inputClass}`}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
+                Preço em R$ (opcional)
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="197,00"
+                  className={`w-32 ${inputClass}`}
+                />
+              </label>
+            </div>
+            <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
+              O que resolve (opcional)
+              <textarea
+                value={whatItSolves}
+                onChange={(e) => setWhatItSolves(e.target.value)}
+                rows={2}
+                placeholder="Ex.: ajuda quem trava na hora de começar a vender no digital."
+                className={`w-full resize-y ${inputClass}`}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
+              Oferta (opcional)
+              <input
+                value={offer}
+                onChange={(e) => setOffer(e.target.value)}
+                placeholder="Ex.: 12x de R$19,90 + bônus de mentoria"
+                className={`w-full ${inputClass}`}
+              />
+            </label>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
+                Destino do CTA (opcional)
+                <select
+                  value={ctaKind}
+                  onChange={(e) => setCtaKind(e.target.value as 'whatsapp' | 'url' | 'checkout')}
+                  className={`w-40 ${inputClass}`}
+                >
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="url">Link (site)</option>
+                  <option value="checkout">Checkout</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
+                {ctaKind === 'whatsapp' ? 'Número do WhatsApp' : 'URL (https)'}
+                <input
+                  value={ctaValue}
+                  onChange={(e) => setCtaValue(e.target.value)}
+                  placeholder={
+                    ctaKind === 'whatsapp' ? '+55 11 99999-9999' : 'https://checkout.exemplo.com'
+                  }
+                  className={`w-72 ${inputClass}`}
+                />
+              </label>
+            </div>
+          </div>
+        ) : null}
+
+        <button
           type="submit"
           disabled={busy || clientSlug.trim().length === 0}
           className="self-start rounded-md border border-accent/50 bg-accent/15 px-4 py-1.5 text-[11px] font-semibold tracking-wider text-accent uppercase transition-colors hover:bg-accent/25 disabled:opacity-50"
@@ -224,4 +330,15 @@ function uploadErrorMessage(error: string | undefined): string {
     default:
       return 'Falha ao enviar imagens/copy — tente de novo.';
   }
+}
+
+/**
+ * Converte um preço digitado em reais (ex.: "197", "197,50", "1.997,00") para centavos inteiros.
+ * Retorna null se não houver dígito algum ou se o formato não casar (defesa antes do envio — o
+ * backend revalida o inteiro).
+ */
+function priceToCents(raw: string): number | null {
+  const cleaned = raw.replace(/[R$\s.]/g, '').replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+  return Math.round(Number(cleaned) * 100);
 }

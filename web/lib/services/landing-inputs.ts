@@ -9,6 +9,7 @@ import {
   manifestPath,
   safeFileName,
   type LandingInputsCopy,
+  type LandingInputsContext,
   type ManifestImage,
 } from '../landing/inputs';
 import { ensurePublicBucket, uploadPublicObject } from '../db/storage';
@@ -33,8 +34,9 @@ export type StoreInputsOutcome = StoreInputsResult | RejectedInput;
 export async function storeLandingInputs(input: {
   images: readonly Blob[];
   copy: LandingInputsCopy | undefined;
+  context: LandingInputsContext | undefined;
 }): Promise<StoreInputsOutcome> {
-  const { images, copy } = input;
+  const { images, copy, context } = input;
 
   if (images.length > MAX_IMAGES) return { rejected: true, reason: 'too_many_images' };
   for (const img of images) {
@@ -60,7 +62,7 @@ export async function storeLandingInputs(input: {
     imageUrls.push(url);
   }
 
-  const manifest = buildInputsManifest(copy, stored, new Date().toISOString());
+  const manifest = buildInputsManifest(copy, context, stored, new Date().toISOString());
   // Garante o bucket mesmo quando só há copy (sem imagens).
   if (images.length === 0) await ensurePublicBucket(LP_INPUTS_BUCKET);
   await uploadPublicObject(

@@ -36,6 +36,40 @@ export const landingInputsCopySchema = z
 
 export type LandingInputsCopy = z.infer<typeof landingInputsCopySchema>;
 
+// Só https para links de saída (checkout/site/WhatsApp). Nunca data:/javascript: (XSS).
+const httpsUrl = z.string().url().refine((u) => u.startsWith('https://'), 'must be an https URL');
+
+/**
+ * Destino do botão de CTA escolhido no wizard. `kind` diz como a skill liga o href:
+ * `checkout` → `settings.checkoutUrl` (CTAs usam `action:'checkout'`); `whatsapp`/`url` → CTA
+ * `action:'url'` com este href. O href já chega normalizado e validado (https).
+ */
+export const landingInputsCtaSchema = z
+  .object({
+    kind: z.enum(['whatsapp', 'url', 'checkout']),
+    href: httpsUrl,
+  })
+  .strict();
+
+export type LandingInputsCta = z.infer<typeof landingInputsCtaSchema>;
+
+/**
+ * Contexto do produto coletado pelo wizard (Etapa 2). Tudo opcional — campos ausentes a IA decide.
+ * É DADO, não instrução: serve de orientação ao architect/copywriter e de valores para settings.
+ */
+export const landingInputsContextSchema = z
+  .object({
+    productName: z.string().trim().min(1).max(200).optional(),
+    whatItSolves: z.string().trim().min(1).max(2000).optional(),
+    // Preço a exibir, em centavos (SPEC: dinheiro sempre inteiro de centavos). Teto sanitário R$1M.
+    priceCents: z.number().int().nonnegative().max(100_000_000).optional(),
+    offer: z.string().trim().min(1).max(500).optional(),
+    cta: landingInputsCtaSchema.optional(),
+  })
+  .strict();
+
+export type LandingInputsContext = z.infer<typeof landingInputsContextSchema>;
+
 // Uma imagem já armazenada (URL pública + nome original sanitizado, só para referência humana).
 export const manifestImageSchema = z
   .object({ url: z.string().url(), name: z.string().max(200) })
@@ -43,12 +77,13 @@ export const manifestImageSchema = z
 
 export type ManifestImage = z.infer<typeof manifestImageSchema>;
 
-/** Manifesto lido pela skill headless. `copy`/`images` ausentes ou vazios = nada a aplicar. */
+/** Manifesto lido pela skill headless. `copy`/`context`/`images` ausentes ou vazios = nada a aplicar. */
 export const landingInputsManifestSchema = z
   .object({
     version: z.literal(1),
     createdAt: z.string(),
     copy: landingInputsCopySchema.optional(),
+    context: landingInputsContextSchema.optional(),
     images: z.array(manifestImageSchema).max(MAX_IMAGES),
   })
   .strict();
@@ -62,17 +97,43 @@ export function normalizeCopy(copy: LandingInputsCopy | undefined): LandingInput
   return entries.length > 0 ? (Object.fromEntries(entries) as LandingInputsCopy) : undefined;
 }
 
-/** Monta o manifesto determinístico a partir da copy normalizada e das imagens já armazenadas. */
+/** Normaliza o contexto: remove chaves ausentes/vazias; undefined se nada sobrou (nada a aplicar). */
+export function normalizeContext(
+  context: LandingInputsContext | undefined,
+): LandingInputsContext | undefined {
+  if (!context) return undefined;
+  const entries = Object.entries(context).filter(([, v]) => {
+    if (v === undefined || v === null) return false;
+    if (typeof v === 'string') return v.length > 0;
+    return true; // number (priceCents) ou objeto (cta) já validados pelo schema
+  });
+  return entries.length > 0 ? (Object.fromEntries(entries) as LandingInputsContext) : undefined;
+}
+
+/**
+ * Monta a URL https do WhatsApp (`wa.me`) a partir de um número livre. Retorna null se, depois de
+ * tirar tudo que não é dígito, sobrar algo fora de 8–15 dígitos (faixa E.164). Não assume DDI.
+ */
+export function whatsappHref(raw: string): string | null {
+  const digits = raw.replace(/\D+/g, '');
+  if (digits.length < 8 || digits.length > 15) return null;
+  return `https://wa.me/${digits}`;
+}
+
+/** Monta o manifesto determinístico a partir da copy/contexto normalizados e das imagens. */
 export function buildInputsManifest(
   copy: LandingInputsCopy | undefined,
+  context: LandingInputsContext | undefined,
   images: readonly ManifestImage[],
   now: string,
 ): LandingInputsManifest {
-  const normalized = normalizeCopy(copy);
+  const normalizedCopy = normalizeCopy(copy);
+  const normalizedContext = normalizeContext(context);
   return {
     version: 1,
     createdAt: now,
-    ...(normalized !== undefined && { copy: normalized }),
+    ...(normalizedCopy !== undefined && { copy: normalizedCopy }),
+    ...(normalizedContext !== undefined && { context: normalizedContext }),
     images: [...images],
   };
 }

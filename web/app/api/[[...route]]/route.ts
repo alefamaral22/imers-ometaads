@@ -42,7 +42,13 @@ import {
 import { editSection } from '../../../lib/services/landing-sections';
 import { enqueueCreateLandingJob } from '../../../lib/services/landing-jobs';
 import { storeLandingInputs } from '../../../lib/services/landing-inputs';
-import { landingInputsCopySchema, MAX_IMAGES } from '../../../lib/landing/inputs';
+import {
+  landingInputsCopySchema,
+  landingInputsContextSchema,
+  whatsappHref,
+  MAX_IMAGES,
+  type LandingInputsContext,
+} from '../../../lib/landing/inputs';
 import { startWatch } from '../../../lib/services/watches';
 import { isSecretsVaultEnabled } from '../../../lib/env';
 import {
@@ -468,11 +474,45 @@ app.post('/landing/inputs', async (c) => {
   if (!parsedCopy.success) return c.json({ error: 'invalid_request' }, 400);
   const copy = Object.keys(parsedCopy.data).length > 0 ? parsedCopy.data : undefined;
 
-  if (images.length === 0 && copy === undefined) {
+  // Contexto do produto (wizard — Etapa 2): produto, preço, oferta, destino do CTA. Tudo opcional;
+  // entrada externa é DADO, não instrução. Preço chega em centavos; o destino do CTA é normalizado
+  // (WhatsApp → wa.me) e só https passa. O schema rejeita o que não casar (anti-XSS/anti-injeção).
+  const rawContext: Record<string, unknown> = {};
+  const productName = form.get('productName');
+  if (typeof productName === 'string' && productName.trim().length > 0) {
+    rawContext.productName = productName.trim();
+  }
+  const whatItSolves = form.get('whatItSolves');
+  if (typeof whatItSolves === 'string' && whatItSolves.trim().length > 0) {
+    rawContext.whatItSolves = whatItSolves.trim();
+  }
+  const offer = form.get('offer');
+  if (typeof offer === 'string' && offer.trim().length > 0) rawContext.offer = offer.trim();
+  const priceCentsRaw = form.get('priceCents');
+  if (typeof priceCentsRaw === 'string' && priceCentsRaw.trim().length > 0) {
+    const n = Number(priceCentsRaw);
+    if (!Number.isInteger(n) || n < 0) return c.json({ error: 'invalid_request' }, 400);
+    rawContext.priceCents = n;
+  }
+  // CTA: kind (whatsapp|url|checkout) + value (número para WhatsApp, https para url/checkout).
+  const ctaKind = form.get('ctaKind');
+  const ctaValue = form.get('ctaValue');
+  if (typeof ctaKind === 'string' && typeof ctaValue === 'string' && ctaValue.trim().length > 0) {
+    const href =
+      ctaKind === 'whatsapp' ? whatsappHref(ctaValue) : ctaValue.trim();
+    if (href === null) return c.json({ error: 'invalid_request' }, 400);
+    rawContext.cta = { kind: ctaKind, href };
+  }
+  const parsedContext = landingInputsContextSchema.safeParse(rawContext);
+  if (!parsedContext.success) return c.json({ error: 'invalid_request' }, 400);
+  const context: LandingInputsContext | undefined =
+    Object.keys(parsedContext.data).length > 0 ? parsedContext.data : undefined;
+
+  if (images.length === 0 && copy === undefined && context === undefined) {
     return c.json({ error: 'nothing_to_store' }, 400);
   }
 
-  const outcome = await storeLandingInputs({ images, copy });
+  const outcome = await storeLandingInputs({ images, copy, context });
   if ('rejected' in outcome) return c.json({ error: outcome.reason }, 400);
   return c.json({ ok: true, inputs_token: outcome.inputsToken, images: outcome.imageUrls }, 201);
 });
