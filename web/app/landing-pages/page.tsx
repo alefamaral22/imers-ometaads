@@ -7,6 +7,8 @@ import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/u
 import { CreateLandingForm } from '../../components/landing/create-landing-form';
 import { CopyLink } from '../../components/landing/copy-link';
 import { BuildingAutoRefresh } from '../../components/landing/building-autorefresh';
+import { LandingProgress } from '../../components/landing/landing-progress';
+import { isInProgress } from '../../lib/landing/progress';
 import { formatCents, formatDate } from '../../lib/domain/format';
 
 export const dynamic = 'force-dynamic';
@@ -22,8 +24,8 @@ export default async function LandingPagesPage() {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
   }
 
-  // Há publicação em andamento? Se sim, a lista se atualiza sozinha até virar deployed/failed.
-  const hasBuilding = pages.some((p) => p.status === 'building');
+  // Há criação/publicação em andamento? Se sim, a lista se atualiza sozinha até virar deployed/failed.
+  const inProgress = pages.filter((p) => isInProgress(p.status));
 
   return (
     <Shell>
@@ -32,7 +34,16 @@ export default async function LandingPagesPage() {
         subtitle="Páginas geradas e publicadas. Rascunhos nascem noindex (preview)."
       />
       <CreateLandingForm />
-      <BuildingAutoRefresh active={hasBuilding} />
+      <BuildingAutoRefresh active={inProgress.length > 0} />
+
+      {inProgress.map((p) => (
+        <LandingProgress
+          key={p.id}
+          subdomain={p.subdomain}
+          status={p.status}
+          startedAt={p.updated_at}
+        />
+      ))}
 
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
       {!error && pages.length === 0 ? <EmptyState>Nenhuma landing page ainda.</EmptyState> : null}
