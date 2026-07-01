@@ -9,6 +9,13 @@ import {
 import { scopeEq, canManageAccount, type AccountScope } from '../multitenant/scope';
 import { sealSecret } from '../multitenant/secrets';
 import { apiKeyEncKey } from '../multitenant/enc-keys';
+import {
+  PROBEABLE_PROVIDERS,
+  classifyKeyProbe,
+  statusFromDecision,
+  type KeyStatus,
+} from '../multitenant/provider-health';
+import { probeApiKey } from '../multitenant/provider-probe';
 
 /**
  * Server-side de api_keys_clientes. LEITURA projeta só colunas de DISPLAY (key_cipher NUNCA sai do
@@ -32,7 +39,12 @@ export interface UpsertApiKeyInput {
   label?: string | undefined;
 }
 
-/** Cria ou rotaciona a chave de um provedor: cifra, grava ciphertext + last4, status 'unverified'. */
+/**
+ * Cria ou rotaciona a chave de um provedor: cifra, grava ciphertext + last4. Provedores com endpoint
+ * de auth barato (anthropic/openai/elevenlabs) são VALIDADOS na hora com um probe — status vira
+ * 'active' (✓) ou 'invalid' (✗) e last_validated_at é gravado. Erro transitório (rede/429/5xx) e
+ * provedores sem probe (minimax/other) ficam 'unverified'.
+ */
 export async function upsertApiKey(
   scope: AccountScope,
   input: UpsertApiKeyInput,
@@ -41,11 +53,25 @@ export async function upsertApiKey(
     throw new Error('forbidden: cannot manage this account');
   }
   const sealed = sealSecret(input.key, apiKeyEncKey());
+
+  let status: KeyStatus = 'unverified';
+  let validatedAt: string | null = null;
+  if (PROBEABLE_PROVIDERS.has(input.provider)) {
+    const probe = await probeApiKey(
+      input.provider as 'anthropic' | 'openai' | 'elevenlabs',
+      input.key,
+    );
+    const decision = classifyKeyProbe(probe);
+    status = statusFromDecision(decision);
+    if (decision.kind !== 'transient') validatedAt = new Date().toISOString();
+  }
+
   const fields = {
     key_cipher: sealed.cipherHex,
     key_last4: sealed.last4,
     label: input.label ?? null,
-    status: 'unverified',
+    status,
+    last_validated_at: validatedAt,
     key_version: 1,
   };
 

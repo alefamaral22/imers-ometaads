@@ -51,5 +51,7 @@ export async function enqueueCreateLandingJob(
   // Slug fixo da allowlist — só falha se a allowlist mudar; nunca por entrada do operador.
   if (pending === null) throw new Error('create-landing slug não resolvido');
 
-  return enqueueJob(buildAgentJobRow(client.id, pending));
+  return enqueueJob(
+    buildAgentJobRow({ clientId: client.id, accountId: client.account_id }, pending),
+  );
 }

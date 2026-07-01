@@ -12,6 +12,7 @@ const ts = z.string(); // timestamptz comes back as ISO string from PostgREST
 // public.clients
 export const clientRowSchema = z.object({
   id: z.string().uuid(),
+  account_id: z.string().uuid(),
   slug: z.string(),
   name: z.string(),
   ad_account_id: z.string().nullable(),

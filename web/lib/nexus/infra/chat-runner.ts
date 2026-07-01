@@ -126,10 +126,13 @@ export async function confirmAndEnqueue(input: {
   if (!isConfirmation(pending, input.id)) {
     return { reply: 'Confirmação inválida — nada foi enfileirado.' };
   }
-  const clientId = pending.args.client_slug
-    ? ((await getClientBySlug(AGENCY_SCOPE, pending.args.client_slug))?.id ?? null)
+  const client = pending.args.client_slug
+    ? await getClientBySlug(AGENCY_SCOPE, pending.args.client_slug)
     : null;
-  const row = buildAgentJobRow(clientId, pending);
+  const row = buildAgentJobRow(
+    { clientId: client?.id ?? null, accountId: client?.account_id ?? null },
+    pending,
+  );
   const result = await enqueueJob(row);
   const reply =
     result.status === 'enqueued'
@@ -178,8 +181,13 @@ async function requestSnapshot(
   if (pending === null) {
     return { reply: 'Não consegui puxar os números agora.' };
   }
-  const clientId = (await getClientBySlug(AGENCY_SCOPE, slug))?.id ?? null;
-  const result = await enqueueJob(buildAgentJobRow(clientId, pending));
+  const client = await getClientBySlug(AGENCY_SCOPE, slug);
+  const result = await enqueueJob(
+    buildAgentJobRow(
+      { clientId: client?.id ?? null, accountId: client?.account_id ?? null },
+      pending,
+    ),
+  );
   return {
     reply: leadingText || 'Deixa eu puxar os números agora…',
     snapshot: { status: result.status, jobId: result.jobId },

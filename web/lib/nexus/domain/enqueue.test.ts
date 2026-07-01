@@ -5,8 +5,9 @@ import { buildAgentJobRow } from './enqueue';
 describe('buildAgentJobRow', () => {
   it('maps a confirmed pending action to an agent_jobs row (status pending, requested_by nexus)', () => {
     const pending = buildPendingAction('analyze', { client_slug: 'cliente-exemplo' }, { id: 't' })!;
-    const row = buildAgentJobRow('client-uuid', pending);
+    const row = buildAgentJobRow({ clientId: 'client-uuid', accountId: 'account-uuid' }, pending);
     expect(row).toMatchObject({
+      account_id: 'account-uuid',
       client_id: 'client-uuid',
       skill: 'funnel-analytics-cliente-exemplo-campaign',
       kind: 'analyze',
@@ -23,7 +24,7 @@ describe('buildAgentJobRow', () => {
       { landing_page_id: 'lp-1' },
       { id: 't' },
     )!;
-    const row = buildAgentJobRow(null, pending);
+    const row = buildAgentJobRow({ clientId: null, accountId: null }, pending);
     expect(row.landing_page_id).toBe('lp-1');
     expect(row.kind).toBe('landing_publish');
   });
