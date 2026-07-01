@@ -16,7 +16,8 @@ import { signSession, verifySession, sha256Hex } from '../../../lib/auth/session
 import { verifyPassword } from '../../../lib/auth/password';
 import { verifyTurnstile } from '../../../lib/auth/turnstile';
 import { limitLogin, limitNexus } from '../../../lib/ratelimit';
-import { listClients, getClientBySlug } from '../../../lib/services/clients';
+import { listClients, getClientBySlug, createClient } from '../../../lib/services/clients';
+import { listProducts, createProduct } from '../../../lib/services/products';
 import { listAllCampaigns } from '../../../lib/services/campaigns';
 import { listAnalyses, getLatestAnalysis, listFunnelEvents } from '../../../lib/services/analyses';
 import { listLandingPages } from '../../../lib/services/landing-pages';
@@ -67,6 +68,8 @@ import {
   upsertApiKeySchema,
   createAccountSchema,
   setAccountActiveSchema,
+  createClientSchema,
+  createProductSchema,
 } from '../../../lib/multitenant/requests';
 import { scopeFromClaims } from '../../../lib/multitenant/scope';
 import { canToggleAccount } from '../../../lib/multitenant/accounts-admin';
@@ -271,6 +274,56 @@ app.patch('/data/accounts/:id', async (c) => {
   return c.json({ account });
 });
 
+// Cadastrar cliente pela UI — super_admin/socio. Nasce na account do criador (das claims, nunca texto livre).
+app.post('/data/clients', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createClientSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const client = await createClient(scopeFromClaims(claims), parsed.data);
+    return c.json({ client }, 201);
+  } catch (err) {
+    if (err instanceof Error && /\b409\b|23505/.test(err.message)) {
+      return c.json({ error: 'conflict' }, 409);
+    }
+    throw err;
+  }
+});
+
+// Produtos de um cliente (brief). Escopo garantido: o cliente precisa ser visível ao chamador.
+app.get('/data/products', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
+  const clientId = c.req.query('client_id');
+  if (clientId === undefined || !UUID_RE.test(clientId)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  return c.json({ products: await listProducts(clientId) });
+});
+
+// Cadastrar produto (brief) — super_admin/socio. O clientId precisa pertencer ao escopo do chamador.
+app.post('/data/products', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createProductSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const product = await createProduct(claims.slug, parsed.data);
+    return c.json({ product }, 201);
+  } catch (err) {
+    if (err instanceof Error && /\b409\b|23505/.test(err.message)) {
+      return c.json({ error: 'conflict' }, 409);
+    }
+    throw err;
+  }
+});
+
 app.get('/data/connections', async (c) => {
   const claims = await apiClaims(c);
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
@@ -450,6 +503,10 @@ app.post('/landing/create', async (c) => {
   const parsed = createLandingSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
   const result = await enqueueCreateLandingJob(scopeFromClaims(claims), parsed.data);
+  // Cliente/produto inexistente: não vira job (mata o falso-verde). 404 com o motivo.
+  if (result.status === 'client_not_found' || result.status === 'product_not_found') {
+    return c.json({ error: result.status }, 404);
+  }
   return c.json({ ok: true, status: result.status, jobId: result.jobId }, 201);
 });
 

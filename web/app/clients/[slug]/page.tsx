@@ -6,6 +6,7 @@ import { listCampaignsByClient } from '../../../lib/services/campaigns';
 import { listAnalysesByClient } from '../../../lib/services/analyses';
 import { listLandingPagesByClient } from '../../../lib/services/landing-pages';
 import { listOperationLogsByClient } from '../../../lib/services/logs';
+import { listProducts } from '../../../lib/services/products';
 import { Shell } from '../../../components/shell';
 import {
   Badge,
@@ -19,6 +20,7 @@ import {
   Th,
 } from '../../../components/ui';
 import { formatCents, formatDate } from '../../../lib/domain/format';
+import { ProductForm } from '../../../components/clients/product-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,12 +38,14 @@ export default async function ClientPage({ params }: { params: Promise<{ slug: s
   let analyses: Awaited<ReturnType<typeof listAnalysesByClient>> = [];
   let pages: Awaited<ReturnType<typeof listLandingPagesByClient>> = [];
   let logs: Awaited<ReturnType<typeof listOperationLogsByClient>> = [];
+  let products: Awaited<ReturnType<typeof listProducts>> = [];
   try {
-    [campaigns, analyses, pages, logs] = await Promise.all([
+    [campaigns, analyses, pages, logs, products] = await Promise.all([
       listCampaignsByClient(client.id),
       listAnalysesByClient(client.id, 10),
       listLandingPagesByClient(client.id),
       listOperationLogsByClient(client.id, 10),
+      listProducts(client.id),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
@@ -92,6 +96,39 @@ export default async function ClientPage({ params }: { params: Promise<{ slug: s
                     <Badge value={c.status} />
                   </Td>
                   <Td>{formatDate(c.created_at)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </div>
+
+      <div className="mt-8">
+        <CardTitle>Produtos</CardTitle>
+        <ProductForm clientId={client.id} />
+        {products.length === 0 ? (
+          <EmptyState>Nenhum produto cadastrado para este cliente.</EmptyState>
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Produto</Th>
+                <Th>Slug</Th>
+                <Th>Subdomínio</Th>
+                <Th>Status</Th>
+                <Th>Criado</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <Td>{p.name}</Td>
+                  <Td>{p.slug}</Td>
+                  <Td>{p.default_subdomain ?? '—'}</Td>
+                  <Td>
+                    <Badge value={p.status} />
+                  </Td>
+                  <Td>{formatDate(p.created_at)}</Td>
                 </tr>
               ))}
             </tbody>

@@ -46,3 +46,61 @@ export type CreateAccountRequest = z.infer<typeof createAccountSchema>;
 
 export const setAccountActiveSchema = z.object({ isActive: z.boolean() });
 export type SetAccountActiveRequest = z.infer<typeof setAccountActiveSchema>;
+
+// slug canônico: a–z, 0–9 e hífen; 2–40 chars (mesmo formato das accounts).
+const slugField = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, 'slug inválido (a–z, 0–9 e hífen; 2–40 chars)');
+
+// Só https em URLs externas (checkout/site). Nunca data:/javascript: (XSS).
+const httpsUrlField = z
+  .string()
+  .trim()
+  .url()
+  .refine((u) => u.startsWith('https://'), 'must be an https URL');
+
+const metaIdField = z
+  .string()
+  .trim()
+  .regex(/^(act_)?\d{1,20}$/, 'id da Meta inválido');
+
+/** Cadastro de cliente pela UI (super_admin/socio). Campos Meta opcionais; o token fica em /settings. */
+export const createClientSchema = z.object({
+  slug: slugField,
+  name: z.string().trim().min(2).max(120),
+  defaultLandingUrl: httpsUrlField.optional(),
+  dailyBudgetCapCents: z.number().int().nonnegative().max(100_000_000).default(5000),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{3}$/, 'moeda inválida (ISO 4217, ex.: BRL)')
+    .default('BRL'),
+  adAccountId: metaIdField.optional(),
+  businessManagerId: metaIdField.optional(),
+  facebookPageId: z
+    .string()
+    .trim()
+    .regex(/^\d{1,20}$/, 'facebook page id inválido')
+    .optional(),
+});
+export type CreateClientRequest = z.infer<typeof createClientSchema>;
+
+/** Cadastro de produto (brief) de um cliente. O brief é DADO curado, validado por schema na fronteira. */
+export const createProductSchema = z.object({
+  clientId: z.string().uuid(),
+  slug: slugField,
+  name: z.string().trim().min(2).max(200),
+  audience: z.string().trim().min(2).max(2000),
+  valueProps: z.array(z.string().trim().min(1).max(500)).min(1).max(12),
+  tone: z.string().trim().min(2).max(500),
+  landingUrl: httpsUrlField,
+  priceCents: z.number().int().nonnegative().max(100_000_000),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{3}$/, 'moeda inválida (ISO 4217, ex.: BRL)')
+    .default('BRL'),
+  defaultSubdomain: slugField.optional(),
+});
+export type CreateProductRequest = z.infer<typeof createProductSchema>;

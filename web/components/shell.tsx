@@ -18,8 +18,11 @@ const NAV = [
   { href: '/settings', label: 'Conexões & chaves' },
 ] as const;
 
-// Onda 14 — "Contas" só para papéis de visibilidade global (a agência e seus sócios).
-const ACCOUNTS_NAV = { href: '/accounts', label: 'Contas' } as const;
+// Só para papéis de visibilidade global (a agência e seus sócios): cadastro de clientes e contas.
+const AGENCY_NAV = [
+  { href: '/clients', label: 'Clientes' },
+  { href: '/accounts', label: 'Contas' },
+] as const;
 
 /** Authenticated dashboard chrome: top nav + content container. Server component. */
 export async function Shell({ children }: { children: ReactNode }) {
@@ -27,7 +30,7 @@ export async function Shell({ children }: { children: ReactNode }) {
   // Visibilidade global = a agência (super_admin/socio). Onda 14: menu Contas. Onda 15: o Nexus é
   // ferramenta da agência — o widget some para cliente_usuario (e a API /nexus/* também os barra).
   const isAgency = session?.role === 'super_admin' || session?.role === 'socio';
-  const nav = isAgency ? [...NAV, ACCOUNTS_NAV] : NAV;
+  const nav = isAgency ? [...NAV, ...AGENCY_NAV] : NAV;
   return (
     <div className="relative z-10 min-h-screen">
       <nav className="sticky top-0 z-20 border-b border-edge/60 bg-bg/80 backdrop-blur-md">

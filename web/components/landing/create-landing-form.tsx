@@ -1,15 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
+interface ClientOption {
+  id: string;
+  slug: string;
+  name: string;
+}
+interface ProductOption {
+  slug: string;
+  name: string;
+}
 
 /**
  * Pedido de criação de landing page a partir da aba (operador). Só dispara o job — o Trafegante
- * (runner headless) cria o rascunho `noindex` e encadeia a publicação. `client_slug` basta; subdomínio
- * e produto são opcionais (a skill resolve um default). Opcionalmente o operador anexa IMAGENS e/ou
- * COPY manual: estes vão primeiro para o Storage (/landing/inputs → inputs_token) e o token segue no
- * /landing/create. Sem imagem/copy o fluxo é idêntico ao anterior (a IA gera tudo). Degrada com
- * mensagens claras.
+ * (runner headless) cria o rascunho `noindex` e encadeia a publicação. Cliente e produto são escolhidos
+ * por dropdown dos cadastrados (evita digitar um cliente inexistente). Opcionalmente o operador anexa
+ * IMAGENS e/ou COPY manual: estes vão primeiro para o Storage (/landing/inputs → inputs_token) e o
+ * token segue no /landing/create. Sem imagem/copy o fluxo é idêntico ao anterior (a IA gera tudo).
  */
 export function CreateLandingForm({
   defaultClientSlug = 'cliente-exemplo',
@@ -17,7 +26,9 @@ export function CreateLandingForm({
   defaultClientSlug?: string;
 }) {
   const router = useRouter();
-  const [clientSlug, setClientSlug] = useState(defaultClientSlug);
+  const [clients, setClients] = useState<ClientOption[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [clientSlug, setClientSlug] = useState('');
   const [subdomain, setSubdomain] = useState('');
   const [productSlug, setProductSlug] = useState('');
   const [images, setImages] = useState<File[]>([]);
@@ -35,6 +46,46 @@ export function CreateLandingForm({
   const [showContext, setShowContext] = useState(false);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Carrega os clientes cadastrados (dropdown). Pré-seleciona o default se ele existir na lista.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/data/clients');
+        if (!res.ok) return;
+        const data = (await res.json()) as { clients?: ClientOption[] };
+        const list = data.clients ?? [];
+        setClients(list);
+        setClientSlug((cur) => cur || (list.some((c) => c.slug === defaultClientSlug) ? defaultClientSlug : (list[0]?.slug ?? '')));
+      } catch {
+        /* degrada: sem lista, o botão fica desabilitado até haver cliente */
+      }
+    })();
+  }, [defaultClientSlug]);
+
+  // Ao trocar de cliente, recarrega os produtos daquele cliente (e limpa a seleção anterior).
+  useEffect(() => {
+    const client = clients.find((c) => c.slug === clientSlug);
+    if (!client) {
+      setProducts([]);
+      setProductSlug('');
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await fetch(`/api/data/products?client_id=${encodeURIComponent(client.id)}`);
+        if (!res.ok) {
+          setProducts([]);
+          return;
+        }
+        const data = (await res.json()) as { products?: ProductOption[] };
+        setProducts(data.products ?? []);
+      } catch {
+        setProducts([]);
+      }
+      setProductSlug('');
+    })();
+  }, [clientSlug, clients]);
 
   const hasCopy =
     headline.trim() || subheadline.trim() || ctaLabel.trim() || notes.trim() ? true : false;
@@ -98,7 +149,16 @@ export function CreateLandingForm({
         }),
       });
       if (res.status === 400) {
-        setStatus('Dados inválidos — use slugs (minúsculas, números e hífen).');
+        setStatus('Dados inválidos — confira os campos.');
+        return;
+      }
+      if (res.status === 404) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setStatus(
+          data.error === 'product_not_found'
+            ? 'Produto não encontrado para este cliente — cadastre-o na página do cliente.'
+            : 'Cliente não encontrado — cadastre-o em Clientes antes de criar a landing page.',
+        );
         return;
       }
       if (!res.ok) {
@@ -133,22 +193,35 @@ export function CreateLandingForm({
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
-            Cliente (slug)
-            <input
+            Cliente
+            <select
               value={clientSlug}
               onChange={(e) => setClientSlug(e.target.value)}
-              placeholder="cliente-exemplo"
-              className={`w-48 ${inputClass}`}
-            />
+              className={`w-56 ${inputClass}`}
+            >
+              {clients.length === 0 ? <option value="">— nenhum cadastrado —</option> : null}
+              {clients.map((c) => (
+                <option key={c.id} value={c.slug}>
+                  {c.name} ({c.slug})
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
-            Produto (slug, opcional)
-            <input
+            Produto (opcional)
+            <select
               value={productSlug}
               onChange={(e) => setProductSlug(e.target.value)}
-              placeholder="curso-exemplo"
-              className={`w-48 ${inputClass}`}
-            />
+              className={`w-56 ${inputClass}`}
+              disabled={products.length === 0}
+            >
+              <option value="">— a IA escolhe —</option>
+              {products.map((p) => (
+                <option key={p.slug} value={p.slug}>
+                  {p.name} ({p.slug})
+                </option>
+              ))}
+            </select>
           </label>
           <label className="flex flex-col gap-1 text-[10px] tracking-wider text-dim uppercase">
             Subdomínio (opcional)

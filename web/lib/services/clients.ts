@@ -1,7 +1,9 @@
 import 'server-only';
-import { selectRows } from '../db/client';
+import { selectRows, insertRows } from '../db/client';
 import { clientRowSchema, parseRows, type ClientRow } from '../domain/schemas';
 import { scopeEq, type AccountScope } from '../multitenant/scope';
+import { writeOperationLog } from './logs';
+import type { CreateClientRequest } from '../multitenant/requests';
 
 /**
  * Server-side reads of public.clients. RLS is closed to the browser (ADR 0002). Onda 15: TODA leitura
@@ -32,4 +34,37 @@ export async function accountClientIds(scope: AccountScope): Promise<string[] | 
   if (!eq) return null; // global
   const rows = await selectRows('clients', { select: 'id', eq });
   return rows.map((r) => (r as { id: string }).id);
+}
+
+/**
+ * Cria um cliente pela UI (super_admin/socio). O cliente nasce na account do criador (das claims da
+ * sessão) — nunca de texto livre. Audita a criação. slug duplicado vira erro do PostgREST (unique).
+ */
+export async function createClient(
+  scope: AccountScope,
+  input: CreateClientRequest,
+): Promise<ClientRow> {
+  const row = {
+    account_id: scope.accountId,
+    slug: input.slug,
+    name: input.name,
+    daily_budget_cap_cents: input.dailyBudgetCapCents,
+    currency: input.currency,
+    ...(input.defaultLandingUrl !== undefined && { default_landing_url: input.defaultLandingUrl }),
+    ...(input.adAccountId !== undefined && { ad_account_id: input.adAccountId }),
+    ...(input.businessManagerId !== undefined && { business_manager_id: input.businessManagerId }),
+    ...(input.facebookPageId !== undefined && { facebook_page_id: input.facebookPageId }),
+  };
+  const inserted = await insertRows('clients', [row]);
+  const client = parseRows(clientRowSchema, inserted)[0];
+  if (!client) throw new Error('insert clients returned no row');
+  await writeOperationLog({
+    entityType: 'client',
+    entityId: client.id,
+    clientId: client.id,
+    action: 'create',
+    actor: scope.accountId,
+    summary: `cliente ${client.slug} cadastrado`,
+  }).catch(() => {});
+  return client;
 }

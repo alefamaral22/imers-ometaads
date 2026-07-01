@@ -26,6 +26,24 @@ export const clientRowSchema = z.object({
 });
 export type ClientRow = z.infer<typeof clientRowSchema>;
 
+// public.products — o brief (jsonb) é o contrato lido pela skill de LP (validado por parseProductBrief).
+export const productRowSchema = z.object({
+  id: z.string().uuid(),
+  client_id: z.string().uuid(),
+  slug: z.string(),
+  name: z.string(),
+  brief: z.record(z.string(), z.unknown()).nullable(),
+  default_subdomain: z.string().nullable(),
+  status: z.string(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type ProductRow = z.infer<typeof productRowSchema>;
+
+// Projeção de DISPLAY dos produtos (sem raw_spec/brief_path — colunas internas).
+export const PRODUCT_DISPLAY_COLUMNS =
+  'id,client_id,slug,name,brief,default_subdomain,status,created_at,updated_at';
+
 // ── Onda 12 — multi-tenant ─────────────────────────────────────────────────────
 // public.accounts
 export const accountRole = z.enum(['super_admin', 'socio', 'cliente_usuario']);
