@@ -81,6 +81,24 @@ export async function insertRow<T extends Record<string, unknown>>(
   }
 }
 
+/** DELETE com filtro PostgREST (ex.: apagar seções órfãs de uma LP ao regenerar). */
+export async function deleteRows(
+  cfg: SupabaseRestConfig,
+  table: string,
+  query: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<void> {
+  const endpoint = `${cfg.url.replace(/\/+$/, '')}/rest/v1/${table}?${query}`;
+  const res = await fetchImpl(endpoint, {
+    method: 'DELETE',
+    headers: restHeaders(cfg, { Prefer: 'return=minimal' }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`delete ${table} failed (${res.status}): ${text}`);
+  }
+}
+
 /** GET com filtro PostgREST (ex.: select de clients por slug). */
 export async function selectRows(
   cfg: SupabaseRestConfig,

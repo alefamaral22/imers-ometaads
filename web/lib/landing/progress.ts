@@ -5,7 +5,7 @@
  * por tempo decorrido (cresce até 95% e só fecha em 100% quando o status real vira `deployed`).
  */
 
-export type LandingStatus = 'draft' | 'building' | 'deployed' | 'failed';
+export type LandingStatus = 'generating' | 'draft' | 'building' | 'deployed' | 'failed';
 
 export type StepState = 'done' | 'active' | 'pending' | 'failed';
 
@@ -16,6 +16,8 @@ export interface ProgressStep {
 
 // Tempo típico de uma publicação (Cloudflare Pages build + deploy). Base da estimativa, não promessa.
 export const TYPICAL_BUILD_MS = 10 * 60 * 1000;
+// Tempo típico da geração do rascunho no runner (scrape + copy + imagens), antes de existir a LP.
+export const TYPICAL_GENERATE_MS = 8 * 60 * 1000;
 
 /** As 3 etapas visíveis ao operador, com o estado de cada uma derivado do status real do banco. */
 export function landingSteps(status: LandingStatus): ProgressStep[] {
@@ -23,6 +25,12 @@ export function landingSteps(status: LandingStatus): ProgressStep[] {
   const publicando = 'Publicando no servidor';
   const noAr = 'No ar';
   switch (status) {
+    case 'generating':
+      return [
+        { label: rascunho, state: 'active' },
+        { label: publicando, state: 'pending' },
+        { label: noAr, state: 'pending' },
+      ];
     case 'draft':
       return [
         { label: rascunho, state: 'done' },
@@ -51,28 +59,35 @@ export function landingSteps(status: LandingStatus): ProgressStep[] {
 }
 
 /**
- * Porcentagem estimada. `deployed` → 100; `failed` → 100 (barra cheia, mas marcada como falha pela cor);
- * `draft` → 10 (rascunho pronto, publish na fila); `building` → cresce de 15% a 95% conforme o tempo
- * decorrido se aproxima do típico, sem nunca cravar 100% antes de o banco confirmar `deployed`.
+ * Porcentagem estimada, monotônica ao longo do ciclo. `generating` → cresce 3%→40% enquanto o runner
+ * monta o rascunho; `draft` → 45% (rascunho pronto, publish na fila); `building` → cresce 50%→95%;
+ * `deployed`/`failed` → 100%. Nunca crava 100% antes de o banco confirmar o fim.
  */
 export function estimateBuildPercent(
   status: LandingStatus,
   elapsedMs: number,
   typicalMs: number = TYPICAL_BUILD_MS,
+  typicalGenerateMs: number = TYPICAL_GENERATE_MS,
 ): number {
   if (status === 'deployed' || status === 'failed') return 100;
-  if (status === 'draft') return 10;
+  if (status === 'generating') {
+    const ratio = Math.min(1, Math.max(0, elapsedMs / typicalGenerateMs));
+    return Math.min(40, Math.round(3 + ratio * 37));
+  }
+  if (status === 'draft') return 45;
   const ratio = Math.min(1, Math.max(0, elapsedMs / typicalMs));
-  return Math.min(95, Math.round(15 + ratio * 80));
+  return Math.min(95, Math.round(50 + ratio * 45));
 }
 
 /** Mensagem curta por status para o card de progresso. */
 export function progressMessage(status: LandingStatus): string {
   switch (status) {
+    case 'generating':
+      return 'Gerando o conteúdo da página (copy, seções e imagens). Pode levar alguns minutos.';
     case 'draft':
       return 'Rascunho pronto. A publicação entrou na fila e começa em instantes.';
     case 'building':
-      return 'Gerando e publicando a página. Pode levar alguns minutos.';
+      return 'Publicando a página no servidor. Pode levar alguns minutos.';
     case 'deployed':
       return 'Página no ar.';
     case 'failed':
@@ -82,5 +97,5 @@ export function progressMessage(status: LandingStatus): string {
 
 /** Uma LP é "em andamento" (mostra progresso) quando ainda não está no ar nem falhou. */
 export function isInProgress(status: LandingStatus): boolean {
-  return status === 'draft' || status === 'building';
+  return status === 'generating' || status === 'draft' || status === 'building';
 }

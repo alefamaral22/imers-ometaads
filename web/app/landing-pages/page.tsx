@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireOperator } from '../../lib/auth/server';
 import { scopeFromClaims } from '../../lib/multitenant/scope';
-import { listLandingPages } from '../../lib/services/landing-pages';
+import { listLandingPages, listActiveLandingCreations } from '../../lib/services/landing-pages';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { CreateLandingForm } from '../../components/landing/create-landing-form';
@@ -18,11 +18,20 @@ export default async function LandingPagesPage() {
 
   let error: string | null = null;
   let pages: Awaited<ReturnType<typeof listLandingPages>> = [];
+  let creations: Awaited<ReturnType<typeof listActiveLandingCreations>> = [];
   try {
-    pages = await listLandingPages(scope, 200);
+    [pages, creations] = await Promise.all([
+      listLandingPages(scope, 200),
+      listActiveLandingCreations(scope),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
   }
+
+  // Subdomínios que já têm linha em landing_pages — para não duplicar o card quando o rascunho já existe.
+  const knownSubdomains = new Set(pages.map((p) => p.subdomain));
+  // Jobs de criação ainda montando o rascunho (a LP ainda não existe no banco): status 'generating'.
+  const generating = creations.filter((c) => !knownSubdomains.has(c.subdomain));
 
   // Há criação/publicação em andamento? Se sim, a lista se atualiza sozinha até virar deployed/failed.
   const inProgress = pages.filter((p) => isInProgress(p.status));
@@ -34,7 +43,16 @@ export default async function LandingPagesPage() {
         subtitle="Páginas geradas e publicadas. Rascunhos nascem noindex (preview)."
       />
       <CreateLandingForm />
-      <BuildingAutoRefresh active={inProgress.length > 0} />
+      <BuildingAutoRefresh active={inProgress.length > 0 || generating.length > 0} />
+
+      {generating.map((c) => (
+        <LandingProgress
+          key={c.jobId}
+          subdomain={c.subdomain}
+          status="generating"
+          startedAt={c.startedAt}
+        />
+      ))}
 
       {inProgress.map((p) => (
         <LandingProgress

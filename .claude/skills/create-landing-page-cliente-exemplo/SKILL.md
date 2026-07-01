@@ -67,6 +67,11 @@ Esta skill segue o playbook reutilizável **[gerador-lp-alta-conversao](../gerad
    - `upsertRow('landing_pages', buildLandingPageRow(...), 'subdomain')` → capture `id`.
    - Para cada seção: `upsertRow('landing_page_sections', buildSectionRow(id, section), 'landing_page_id,type')`.
    - Linhas montadas por `scripts/onda8/application/persistence-rows.ts`.
+   - **Limpe seções órfãs (obrigatório ao regenerar):** o upsert atualiza/insere, mas NUNCA apaga. Se o
+     subdomínio já tinha uma LP com seções de outra geração (ex.: `pricing`/`offer` que a nova não tem),
+     elas ficam misturadas e o publish é cancelado por conflito. Apague as que não estão na nova geração:
+     `deleteRows('landing_page_sections', 'landing_page_id=eq.<id>&type=not.in.(<tipos_novos>)')`, onde
+     `<tipos_novos>` é a lista dos `type` que você acabou de persistir (ex.: `hero,problem,solution,footer`).
 8. **Enfileirar publish** — insira em `agent_jobs`
    `{ client_id, landing_page_id, skill:'publish-landing-page-cliente-exemplo', kind:'landing_publish',
    args:{ subdomain }, status:'pending', requested_by:'skill' }` (o índice único parcial evita duplicar).
