@@ -2,9 +2,11 @@ import 'server-only';
 import { selectRows, patchRows, insertRows } from '../db/client';
 import {
   accountRowSchema,
+  planChangeRowSchema,
   parseRows,
   ACCOUNT_DISPLAY_COLUMNS,
   type AccountRow,
+  type PlanChangeRow,
 } from '../domain/schemas';
 import { readSession } from '../auth/server';
 import { scopeFromClaims, type AccountScope } from '../multitenant/scope';
@@ -135,4 +137,53 @@ export async function setAccountActive(
     summary: `account ${account.slug} ${isActive ? 'reativada' : 'desativada'}`,
   }).catch(() => {});
   return account;
+}
+
+// ── Onda A — atribuição/troca de plano com trilha de auditoria (plan_changes) ──
+
+/** Troca o plano de uma account: patch plan_id + append em plan_changes + audita. */
+export async function assignPlan(
+  actorSlug: string,
+  accountId: string,
+  toPlanId: string,
+  reason?: string,
+): Promise<AccountRow> {
+  // Lê o plano atual para registrar from_plan_id no histórico (pode ser null na primeira atribuição).
+  const current = await selectRows('accounts', {
+    select: 'plan_id',
+    eq: { id: accountId },
+    limit: 1,
+  });
+  const fromPlanId = (current[0] as { plan_id?: string | null } | undefined)?.plan_id ?? null;
+
+  const updated = await patchRows('accounts', { id: accountId }, { plan_id: toPlanId });
+  const account = parseRows(accountRowSchema, updated)[0];
+  if (!account) throw new Error('patch accounts returned no row');
+
+  await insertRows('plan_changes', [
+    {
+      account_id: accountId,
+      from_plan_id: fromPlanId,
+      to_plan_id: toPlanId,
+      changed_by: actorSlug,
+      reason: reason ?? null,
+    },
+  ]);
+  await writeOperationLog({
+    entityType: 'account',
+    entityId: account.id,
+    action: 'update',
+    actor: actorSlug,
+    summary: `plano da account ${account.slug} trocado`,
+  }).catch(() => {});
+  return account;
+}
+
+/** Histórico de trocas de plano de uma account (mais recente primeiro). */
+export async function listPlanChanges(accountId: string): Promise<PlanChangeRow[]> {
+  const rows = await selectRows('plan_changes', {
+    eq: { account_id: accountId },
+    order: 'created_at.desc',
+  });
+  return parseRows(planChangeRowSchema, rows);
 }

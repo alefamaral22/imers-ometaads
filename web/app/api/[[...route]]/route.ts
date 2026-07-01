@@ -60,9 +60,11 @@ import {
   createAccount,
   getAccountById,
   setAccountActive,
+  assignPlan,
 } from '../../../lib/services/accounts';
 import { listConnections, createConnection } from '../../../lib/services/connections';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
+import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
 import {
   createConnectionSchema,
   upsertApiKeySchema,
@@ -70,6 +72,9 @@ import {
   setAccountActiveSchema,
   createClientSchema,
   createProductSchema,
+  createPlanSchema,
+  updatePlanSchema,
+  assignPlanSchema,
 } from '../../../lib/multitenant/requests';
 import { scopeFromClaims } from '../../../lib/multitenant/scope';
 import { canToggleAccount } from '../../../lib/multitenant/accounts-admin';
@@ -271,6 +276,69 @@ app.patch('/data/accounts/:id', async (c) => {
   const decision = canToggleAccount(claims.sub, target);
   if (!decision.ok) return c.json({ error: 'forbidden', reason: decision.reason }, 403);
   const account = await setAccountActive(claims.slug, id, parsed.data.isActive);
+  return c.json({ account });
+});
+
+// ── Onda A — planos configuráveis ──────────────────────────────────────────────
+// Listar planos: visibilidade global (super_admin/socio). Usado pela página /plans e pelo dropdown
+// de plano no cadastro de account.
+app.get('/data/plans', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
+  return c.json({ plans: await listPlans() });
+});
+
+// Criar plano — só super_admin. slug duplicado → 409 genérico.
+app.post('/data/plans', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createPlanSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const plan = await createPlan(claims.slug, parsed.data);
+    return c.json({ plan }, 201);
+  } catch (err) {
+    if (err instanceof Error && /\b409\b|23505/.test(err.message)) {
+      return c.json({ error: 'conflict' }, 409);
+    }
+    throw err;
+  }
+});
+
+// Editar/desativar plano (soft via is_active) — só super_admin.
+app.patch('/data/plans/:id', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = updatePlanSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const plan = await updatePlan(claims.slug, id, parsed.data);
+  return c.json({ plan });
+});
+
+// Atribuir/trocar o plano de uma account — só super_admin. Registra em plan_changes.
+app.patch('/data/accounts/:id/plan', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = assignPlanSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const target = await getAccountById(id);
+  if (!target) return c.json({ error: 'not_found' }, 404);
+  const account = await assignPlan(claims.slug, id, parsed.data.planId, parsed.data.reason);
   return c.json({ account });
 });
 
@@ -507,6 +575,10 @@ app.post('/landing/create', async (c) => {
   if (result.status === 'client_not_found' || result.status === 'product_not_found') {
     return c.json({ error: result.status }, 404);
   }
+  // Teto de LPs do plano atingido: 422 com o limite/contagem para a UI explicar.
+  if (result.status === 'plan_limit') {
+    return c.json({ error: 'plan_limit', limit: result.limit, current: result.current }, 422);
+  }
   return c.json({ ok: true, status: result.status, jobId: result.jobId }, 201);
 });
 
@@ -555,8 +627,7 @@ app.post('/landing/inputs', async (c) => {
   const ctaKind = form.get('ctaKind');
   const ctaValue = form.get('ctaValue');
   if (typeof ctaKind === 'string' && typeof ctaValue === 'string' && ctaValue.trim().length > 0) {
-    const href =
-      ctaKind === 'whatsapp' ? whatsappHref(ctaValue) : ctaValue.trim();
+    const href = ctaKind === 'whatsapp' ? whatsappHref(ctaValue) : ctaValue.trim();
     if (href === null) return c.json({ error: 'invalid_request' }, 400);
     rawContext.cta = { kind: ctaKind, href };
   }

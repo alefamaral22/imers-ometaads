@@ -42,9 +42,20 @@ export function ApiKeyForm({
         body: JSON.stringify({ accountId, provider, key, ...(label ? { label } : {}) }),
       });
       if (res.ok) {
+        const saved: unknown = await res.json().catch(() => null);
+        const status =
+          saved && typeof saved === 'object' && 'apiKey' in saved
+            ? (saved.apiKey as { status?: string }).status
+            : undefined;
         setKey('');
         setLabel('');
-        setOkMsg('Chave salva (cifrada). Substitui a anterior do mesmo provedor.');
+        setOkMsg(
+          status === 'active'
+            ? '✓ Conectado — chave salva (cifrada) e validada.'
+            : status === 'invalid'
+              ? '✗ Chave inválida — salva, mas o provedor recusou. Confira e salve de novo.'
+              : 'Chave salva (cifrada). Não foi possível validar agora — status: não verificada.',
+        );
         router.refresh();
         return;
       }

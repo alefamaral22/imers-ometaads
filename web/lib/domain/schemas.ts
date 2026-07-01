@@ -12,6 +12,7 @@ const ts = z.string(); // timestamptz comes back as ISO string from PostgREST
 // public.clients
 export const clientRowSchema = z.object({
   id: z.string().uuid(),
+  account_id: z.string().uuid(),
   slug: z.string(),
   name: z.string(),
   ad_account_id: z.string().nullable(),
@@ -53,6 +54,7 @@ export const accountRowSchema = z.object({
   name: z.string(),
   role: accountRole,
   plan: z.string(),
+  plan_id: z.string().uuid().nullable(),
   subscription_status: z.string(),
   is_active: z.boolean(),
   email: z.string().nullable(), // identificador de login (não-segredo); null até ter senha própria
@@ -64,7 +66,43 @@ export type AccountRow = z.infer<typeof accountRowSchema>;
 
 // Projeção de DISPLAY das accounts: NUNCA inclui password_hash → o hash nunca sai do servidor.
 export const ACCOUNT_DISPLAY_COLUMNS =
-  'id,slug,name,role,plan,subscription_status,is_active,email,last_login_at,created_at,updated_at';
+  'id,slug,name,role,plan,plan_id,subscription_status,is_active,email,last_login_at,created_at,updated_at';
+
+// ── Onda A — planos configuráveis ───────────────────────────────────────────────
+// public.plans — catálogo comercial. Limites null = ilimitado. features (jsonb) = flags do plano.
+export const planRowSchema = z.object({
+  id: z.string().uuid(),
+  slug: z.string(),
+  name: z.string(),
+  price_cents: z.number().int(),
+  currency: z.string(),
+  trial_days: z.number().int(),
+  max_clients: z.number().int().nullable(),
+  max_landing_pages: z.number().int().nullable(),
+  max_campaigns: z.number().int().nullable(),
+  max_users: z.number().int().nullable(),
+  features: z.record(z.string(), z.unknown()),
+  is_active: z.boolean(),
+  sort_order: z.number().int(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type PlanRow = z.infer<typeof planRowSchema>;
+
+export const PLAN_DISPLAY_COLUMNS =
+  'id,slug,name,price_cents,currency,trial_days,max_clients,max_landing_pages,max_campaigns,max_users,features,is_active,sort_order,created_at,updated_at';
+
+// public.plan_changes — trilha de auditoria de troca de plano por account.
+export const planChangeRowSchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid(),
+  from_plan_id: z.string().uuid().nullable(),
+  to_plan_id: z.string().uuid(),
+  changed_by: z.string(),
+  reason: z.string().nullable(),
+  created_at: ts,
+});
+export type PlanChangeRow = z.infer<typeof planChangeRowSchema>;
 
 // public.ad_account_connections — projeção de DISPLAY: NUNCA inclui access_token_cipher.
 export const connectionStatus = z.enum(['unverified', 'active', 'invalid', 'revoked']);

@@ -22,6 +22,7 @@ const NAV = [
 const AGENCY_NAV = [
   { href: '/clients', label: 'Clientes' },
   { href: '/accounts', label: 'Contas' },
+  { href: '/plans', label: 'Planos' },
 ] as const;
 
 /** Authenticated dashboard chrome: top nav + content container. Server component. */

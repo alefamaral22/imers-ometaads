@@ -1,5 +1,6 @@
 import { requireRole } from '../../lib/auth/server';
 import { listAccounts } from '../../lib/services/accounts';
+import { listPlans } from '../../lib/services/plans';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { formatDate } from '../../lib/domain/format';
@@ -21,8 +22,10 @@ export default async function AccountsPage() {
 
   let error: string | null = null;
   let accounts: Awaited<ReturnType<typeof listAccounts>> = [];
+  let plans: { slug: string; name: string }[] = [];
   try {
     accounts = await listAccounts();
+    plans = (await listPlans(true)).map((p) => ({ slug: p.slug, name: p.name }));
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
   }
@@ -40,7 +43,7 @@ export default async function AccountsPage() {
 
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
 
-      {isAdmin ? <AccountForm /> : null}
+      {isAdmin ? <AccountForm plans={plans} /> : null}
 
       {!error && accounts.length === 0 ? (
         <EmptyState>Nenhuma conta cadastrada ainda.</EmptyState>
