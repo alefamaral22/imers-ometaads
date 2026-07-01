@@ -18,14 +18,12 @@ const ROLES = [
   { value: 'socio', label: 'Sócio' },
 ] as const;
 
-const PLANS = ['trial', 'starter', 'pro', 'agency'] as const;
-
-export function AccountForm() {
+export function AccountForm({ plans }: { plans: { slug: string; name: string }[] }) {
   const router = useRouter();
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<string>('cliente_usuario');
-  const [plan, setPlan] = useState<string>('trial');
+  const [plan, setPlan] = useState<string>(plans[0]?.slug ?? 'trial');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -103,9 +101,9 @@ export function AccountForm() {
       <div>
         <label className="block text-xs text-dim">Plano</label>
         <select value={plan} onChange={(e) => setPlan(e.target.value)} className={input}>
-          {PLANS.map((p) => (
-            <option key={p} value={p}>
-              {p}
+          {plans.map((p) => (
+            <option key={p.slug} value={p.slug}>
+              {p.name}
             </option>
           ))}
         </select>

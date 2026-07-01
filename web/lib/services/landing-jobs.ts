@@ -4,18 +4,21 @@ import { buildAgentJobRow } from '../nexus/domain/enqueue';
 import { enqueueJob, type EnqueueResult } from '../nexus/infra/agent-jobs';
 import { getClientBySlug } from './clients';
 import { listProducts } from './products';
+import { assertWithinLandingLimit, PlanLimitError } from './plan-enforcement';
 import type { AccountScope } from '../multitenant/scope';
 import type { CreateLandingInput } from '../landing/edit';
 
 /**
  * Resultado do enfileiramento de uma criação de LP. Além dos estados normais da fila, um pedido para
  * um cliente/produto que não existe é REJEITADO aqui (não vira job) — mata o falso-verde em que um job
- * para cliente inexistente rodava, não achava nada e "completava" sem criar a LP.
+ * para cliente inexistente rodava, não achava nada e "completava" sem criar a LP. `plan_limit` = teto
+ * de LPs do plano atingido (Onda A).
  */
 export type CreateLandingOutcome =
   | EnqueueResult
   | { status: 'client_not_found'; jobId: null }
-  | { status: 'product_not_found'; jobId: null };
+  | { status: 'product_not_found'; jobId: null }
+  | { status: 'plan_limit'; jobId: null; limit: number; current: number };
 
 /**
  * Enfileira o job de CRIAÇÃO de uma landing page pedido pelo operador na aba (não pelo Trafegante).
@@ -31,6 +34,16 @@ export async function enqueueCreateLandingJob(
   // O cliente precisa existir DENTRO do escopo do chamador — senão o job rodaria à toa (falso-verde).
   const client = await getClientBySlug(scope, input.client_slug);
   if (!client) return { status: 'client_not_found', jobId: null };
+
+  // Teto de LPs do plano da account dona do cliente (no-op para a agência). Estouro → não enfileira.
+  try {
+    await assertWithinLandingLimit(scope, client.account_id);
+  } catch (err) {
+    if (err instanceof PlanLimitError) {
+      return { status: 'plan_limit', jobId: null, limit: err.limit, current: err.current };
+    }
+    throw err;
+  }
 
   // Se um produto foi informado, ele precisa existir para o cliente (a skill lê o brief dele).
   if (input.product_slug) {
