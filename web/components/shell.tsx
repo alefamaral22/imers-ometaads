@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { LogoutButton } from './logout-button';
 import { NexusWidget } from './nexus/nexus-widget';
-import { readSession } from '../lib/auth/server';
+import { readSession, readImpersonation } from '../lib/auth/server';
+import { ImpersonationBanner } from './accounts/impersonation-banner';
 
 const ROLE_LABEL: Record<string, string> = {
   super_admin: 'agência',
@@ -32,8 +33,11 @@ export async function Shell({ children }: { children: ReactNode }) {
   // ferramenta da agência — o widget some para cliente_usuario (e a API /nexus/* também os barra).
   const isAgency = session?.role === 'super_admin' || session?.role === 'socio';
   const nav = isAgency ? [...NAV, ...AGENCY_NAV] : NAV;
+  // Impersonação (etapa super-admin-completo): só relevante quando a sessão real é super_admin.
+  const impersonating = session?.role === 'super_admin' ? await readImpersonation() : null;
   return (
     <div className="relative z-10 min-h-screen">
+      {impersonating ? <ImpersonationBanner targetSlug={impersonating.targetSlug} /> : null}
       <nav className="sticky top-0 z-20 border-b border-edge/60 bg-bg/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-6">

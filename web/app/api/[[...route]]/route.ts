@@ -21,7 +21,7 @@ import { listProducts, createProduct } from '../../../lib/services/products';
 import { listAllCampaigns } from '../../../lib/services/campaigns';
 import { listAnalyses, getLatestAnalysis, listFunnelEvents } from '../../../lib/services/analyses';
 import { listLandingPages } from '../../../lib/services/landing-pages';
-import { listOperationLogs } from '../../../lib/services/logs';
+import { listOperationLogs, writeOperationLog } from '../../../lib/services/logs';
 import { listNarrations } from '../../../lib/services/narrations';
 import { getLatestSnapshot, getSnapshotByJobId } from '../../../lib/services/live-snapshots';
 import { getAgentPulse } from '../../../lib/services/agent-jobs';
@@ -61,7 +61,11 @@ import {
   getAccountById,
   setAccountActive,
   assignPlan,
+  resetAccountPassword,
+  archiveAccount,
 } from '../../../lib/services/accounts';
+import { notifyPasswordReset } from '../../../lib/services/notify';
+import { IMPERSONATION_COOKIE_NAME, IMPERSONATION_TTL_SECONDS } from '../../../lib/auth/domain';
 import { listConnections, createConnection } from '../../../lib/services/connections';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
@@ -70,6 +74,8 @@ import {
   upsertApiKeySchema,
   createAccountSchema,
   setAccountActiveSchema,
+  resetAccountPasswordSchema,
+  archiveAccountSchema,
   createClientSchema,
   createProductSchema,
   createPlanSchema,
@@ -276,6 +282,88 @@ app.patch('/data/accounts/:id', async (c) => {
   const decision = canToggleAccount(claims.sub, target);
   if (!decision.ok) return c.json({ error: 'forbidden', reason: decision.reason }, 403);
   const account = await setAccountActive(claims.slug, id, parsed.data.isActive);
+  return c.json({ account });
+});
+
+// Redefinir senha de qualquer account — só super_admin. Notifica por e-mail (fail-safe: nunca
+// bloqueia a resposta se o envio falhar).
+app.patch('/data/accounts/:id/password', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = resetAccountPasswordSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const target = await getAccountById(id);
+  if (!target) return c.json({ error: 'not_found' }, 404);
+  const account = await resetAccountPassword(claims.slug, id, parsed.data.password);
+  if (account.email) await notifyPasswordReset(account.email, account.name).catch(() => {});
+  return c.json({ account });
+});
+
+// Impersonar (SOMENTE LEITURA) — só super_admin. Cookie separado, TTL curto (30min); nunca é usado
+// para autorizar mutação (todo endpoint de escrita continua checando hasRole sobre a sessão real).
+app.post('/data/accounts/:id/impersonate', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const target = await getAccountById(id);
+  if (!target) return c.json({ error: 'not_found' }, 404);
+  if (target.role === 'super_admin') return c.json({ error: 'forbidden' }, 403);
+  setCookie(
+    c,
+    IMPERSONATION_COOKIE_NAME,
+    JSON.stringify({ actorAccountId: claims.sub, targetAccountId: target.id, targetSlug: target.slug }),
+    {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: IMPERSONATION_TTL_SECONDS,
+    },
+  );
+  await writeOperationLog({
+    entityType: 'account',
+    entityId: target.id,
+    action: 'update',
+    actor: claims.slug,
+    summary: `super_admin iniciou visualização como ${target.slug} (somente leitura)`,
+  }).catch(() => {});
+  return c.json({ ok: true, targetSlug: target.slug });
+});
+
+app.post('/data/impersonate/stop', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  deleteCookie(c, IMPERSONATION_COOKIE_NAME, { path: '/' });
+  return c.json({ ok: true });
+});
+
+// Arquivar (soft, irreversível) uma account — só super_admin; nunca a si mesmo nem outro super_admin.
+app.post('/data/accounts/:id/archive', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!hasRole(claims, ['super_admin'])) return c.json({ error: 'forbidden' }, 403);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = archiveAccountSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const target = await getAccountById(id);
+  if (!target) return c.json({ error: 'not_found' }, 404);
+  const decision = canToggleAccount(claims.sub, target);
+  if (!decision.ok) return c.json({ error: 'forbidden', reason: decision.reason }, 403);
+  const account = await archiveAccount(claims.slug, id);
   return c.json({ account });
 });
 

@@ -51,7 +51,11 @@ export interface LoginAccount {
   passwordHash: string | null;
 }
 
-/** Resolve uma account ativa por email para o login. password_hash fica server-side (nunca exposto). */
+/**
+ * Resolve uma account ativa por email para o login. password_hash fica server-side (nunca exposto).
+ * `is_active=true` já filtra contas arquivadas (archiveAccount também zera is_active) — cinto e
+ * suspensório, mas o filtro real de "arquivada nunca loga" vive em is_active.
+ */
 export async function getLoginAccountByEmail(email: string): Promise<LoginAccount | null> {
   const rows = await selectRows('accounts', {
     select: 'id,role,slug,password_hash',
@@ -127,6 +131,54 @@ export async function getAccountById(
   const row = rows[0] as { id?: string; role?: AccountRole; slug?: string } | undefined;
   if (!row?.id || !row.role || !row.slug) return null;
   return { id: row.id, role: row.role, slug: row.slug };
+}
+
+/**
+ * Redefine a senha de uma account (super_admin). Novo hash scrypt; nunca devolve o hash. Audita a
+ * ação (sem registrar a senha em texto puro em nenhum lugar).
+ */
+export async function resetAccountPassword(
+  actorSlug: string,
+  accountId: string,
+  newPassword: string,
+): Promise<AccountRow> {
+  const updated = await patchRows(
+    'accounts',
+    { id: accountId },
+    { password_hash: hashPassword(newPassword) },
+  );
+  const account = parseRows(accountRowSchema, updated)[0];
+  if (!account) throw new Error('patch accounts returned no row');
+  await writeOperationLog({
+    entityType: 'account',
+    entityId: account.id,
+    action: 'update',
+    actor: actorSlug,
+    summary: `senha da account ${account.slug} redefinida pelo super_admin`,
+  }).catch(() => {});
+  return account;
+}
+
+/**
+ * Arquiva (soft, irreversível) uma account: marca archived_at e desativa o login (is_active=false).
+ * Nunca hard-delete (ADR 0030) — preserva FKs/auditoria. Sem "desarquivar" pela UI de propósito.
+ */
+export async function archiveAccount(actorSlug: string, accountId: string): Promise<AccountRow> {
+  const updated = await patchRows(
+    'accounts',
+    { id: accountId },
+    { archived_at: new Date().toISOString(), is_active: false },
+  );
+  const account = parseRows(accountRowSchema, updated)[0];
+  if (!account) throw new Error('patch accounts returned no row');
+  await writeOperationLog({
+    entityType: 'account',
+    entityId: account.id,
+    action: 'delete',
+    actor: actorSlug,
+    summary: `account ${account.slug} arquivada (irreversível)`,
+  }).catch(() => {});
+  return account;
 }
 
 /** Ativa/desativa uma account (soft). Desativar corta o login imediatamente. Audita a ação. */

@@ -47,6 +47,14 @@ export type CreateAccountRequest = z.infer<typeof createAccountSchema>;
 export const setAccountActiveSchema = z.object({ isActive: z.boolean() });
 export type SetAccountActiveRequest = z.infer<typeof setAccountActiveSchema>;
 
+// Etapa "super-admin completo" — redefinir senha de qualquer account pelo super_admin.
+export const resetAccountPasswordSchema = z.object({ password: z.string().min(8).max(256) });
+export type ResetAccountPasswordRequest = z.infer<typeof resetAccountPasswordSchema>;
+
+// Etapa "super-admin completo" — arquivar (soft, irreversível) uma account.
+export const archiveAccountSchema = z.object({ confirm: z.literal(true) });
+export type ArchiveAccountRequest = z.infer<typeof archiveAccountSchema>;
+
 /**
  * Onda A — planos configuráveis. Money em centavos int; limites null = ilimitado. `features` é um
  * objeto de flags curado (dado, não instrução). slug canônico como o das accounts.

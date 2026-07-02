@@ -17,6 +17,9 @@ import {
 import { formatDate } from '../../../lib/domain/format';
 import { ApiKeyForm } from '../../../components/settings/api-key-form';
 import { ConnectionForm } from '../../../components/settings/connection-form';
+import { ResetPasswordForm } from '../../../components/accounts/reset-password-form';
+import { ArchiveAccountButton } from '../../../components/accounts/archive-account-button';
+import { ImpersonateButton } from '../../../components/accounts/impersonate-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +81,22 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm text-ink/90">{formatDate(account.current_period_end)}</p>
         </Card>
       </div>
+
+      {isAdmin ? (
+        <>
+          {account.role !== 'super_admin' ? (
+            <div className="mb-6">
+              <ImpersonateButton accountId={account.id} />
+            </div>
+          ) : null}
+
+          <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Redefinir senha</h2>
+          <ResetPasswordForm accountId={account.id} />
+
+          <h2 className="mt-8 mb-3 text-sm font-semibold text-danger/90">Zona de risco</h2>
+          <ArchiveAccountButton accountId={account.id} slug={account.slug} />
+        </>
+      ) : null}
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Histórico de plano</h2>
       {planChanges.length === 0 ? (

@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { requireOperator } from '../lib/auth/server';
-import { scopeFromClaims } from '../lib/multitenant/scope';
+import { readEffectiveScope } from '../lib/auth/server';
 import { listClients } from '../lib/services/clients';
 import { listAllCampaigns } from '../lib/services/campaigns';
 import { listAnalyses } from '../lib/services/analyses';
@@ -31,7 +30,10 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
-  const scope = scopeFromClaims(await requireOperator());
+  const { claims, impersonating } = await readEffectiveScope();
+  const scope = impersonating
+    ? { role: 'cliente_usuario' as const, accountId: impersonating.targetAccountId }
+    : { role: claims.role, accountId: claims.sub };
 
   // The dashboard degrades gracefully when the DB is unreachable (e.g. unconfigured env in preview).
   let error: string | null = null;
