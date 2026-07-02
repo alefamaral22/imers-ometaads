@@ -31,8 +31,13 @@ npm run format      # Prettier --check
 ## Regras invioláveis
 
 - **Segredos** nunca no código; `.env.example` é o contrato; `NEXT_PUBLIC_*` vão ao browser (nada secreto).
-- **Meta** só via MCP `mcp-meta-ads` (sem token Meta em env). Campanha **sempre nasce PAUSED**, dentro
-  do teto `daily_budget_cap_cents`. Ver gotchas em SPEC §10.
+- **Meta**: cada tenant conecta sua própria conta de anúncio via token de API (System User), cifrado
+  em repouso (`ad_account_connections`), decifrado só server-side no instante da chamada — nunca em
+  env, nunca em log. Um cliente pode ter **múltiplas conexões** (múltiplas contas de anúncio); a
+  escolha de qual usar é **sempre explícita por job** (nunca fallback implícito — aborta na dúvida).
+  O MCP `mcp-meta-ads` compartilhado deixou de ser usado para escrita de campanha (ADR 0035); segue
+  disponível só para leitura ao vivo do Nexus (ADR 0032). Campanha **sempre nasce PAUSED**, dentro do
+  teto `daily_budget_cap_cents`. Ver gotchas em SPEC §10.
 - **Skills headless**: sem `AskUserQuestion`; persistem via REST + `SUPABASE_SECRET_KEY` (não MCP do
   Supabase); manifest JSON + `operation_logs` por mutação; idempotentes.
 - **Dinheiro** sempre em inteiro de centavos. **IDs Meta** em `text`.

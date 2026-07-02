@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireRole } from '../../lib/auth/server';
 import { listAccounts } from '../../lib/services/accounts';
 import { listPlans } from '../../lib/services/plans';
@@ -58,7 +59,9 @@ export default async function AccountsPage() {
               <Th>Plano</Th>
               <Th>E-mail</Th>
               <Th>Status</Th>
+              <Th>Assinatura</Th>
               <Th>Último login</Th>
+              <Th> </Th>
               {isAdmin ? <Th> </Th> : null}
             </tr>
           </thead>
@@ -75,7 +78,15 @@ export default async function AccountsPage() {
                   <Td>
                     <Badge value={a.is_active ? 'ativa' : 'inativa'} />
                   </Td>
+                  <Td>
+                    <Badge value={a.subscription_status} />
+                  </Td>
                   <Td>{formatDate(a.last_login_at)}</Td>
+                  <Td>
+                    <Link href={`/accounts/${a.id}`} className="text-accent hover:underline">
+                      Ver detalhe
+                    </Link>
+                  </Td>
                   {isAdmin ? (
                     <Td>{togglable ? <AccountToggle id={a.id} isActive={a.is_active} /> : null}</Td>
                   ) : null}

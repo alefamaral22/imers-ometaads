@@ -3,10 +3,19 @@ import { selectRows, patchRows, insertRows } from '../db/client';
 import {
   accountRowSchema,
   planChangeRowSchema,
+  planRowSchema,
+  connectionDisplaySchema,
+  apiKeyDisplaySchema,
   parseRows,
   ACCOUNT_DISPLAY_COLUMNS,
+  PLAN_DISPLAY_COLUMNS,
+  CONNECTION_DISPLAY_COLUMNS,
+  API_KEY_DISPLAY_COLUMNS,
   type AccountRow,
   type PlanChangeRow,
+  type PlanRow,
+  type ConnectionDisplay,
+  type ApiKeyDisplay,
 } from '../domain/schemas';
 import { readSession } from '../auth/server';
 import { scopeFromClaims, type AccountScope } from '../multitenant/scope';
@@ -186,4 +195,52 @@ export async function listPlanChanges(accountId: string): Promise<PlanChangeRow[
     order: 'created_at.desc',
   });
   return parseRows(planChangeRowSchema, rows);
+}
+
+// ── Etapa "super-admin completo" — detalhe agregado de uma account ──
+
+export interface AccountDetail {
+  account: AccountRow;
+  plan: PlanRow | null;
+  planChanges: PlanChangeRow[];
+  apiKeys: ApiKeyDisplay[];
+  connections: ConnectionDisplay[]; // pode ter mais de uma (múltiplas contas de anúncio Meta)
+}
+
+/**
+ * Agrega tudo que a página /accounts/[id] precisa numa leitura: a account, o plano associado, o
+ * histórico de trocas, as chaves de provedor e TODAS as conexões Meta (ADR 0035 — um cliente pode
+ * ter múltiplas contas de anúncio). Nenhum segredo em texto puro sai daqui (projeções de DISPLAY).
+ */
+export async function getAccountDetail(accountId: string): Promise<AccountDetail | null> {
+  const rows = await selectRows('accounts', {
+    select: ACCOUNT_DISPLAY_COLUMNS,
+    eq: { id: accountId },
+    limit: 1,
+  });
+  const account = parseRows(accountRowSchema, rows)[0];
+  if (!account) return null;
+
+  const [plan, planChanges, apiKeys, connections] = await Promise.all([
+    account.plan_id
+      ? selectRows('plans', {
+          select: PLAN_DISPLAY_COLUMNS,
+          eq: { id: account.plan_id },
+          limit: 1,
+        }).then((r) => parseRows(planRowSchema, r)[0] ?? null)
+      : Promise.resolve(null),
+    listPlanChanges(accountId),
+    selectRows('api_keys_clientes', {
+      select: API_KEY_DISPLAY_COLUMNS,
+      eq: { account_id: accountId },
+      order: 'provider.asc',
+    }).then((r) => parseRows(apiKeyDisplaySchema, r)),
+    selectRows('ad_account_connections', {
+      select: CONNECTION_DISPLAY_COLUMNS,
+      eq: { account_id: accountId },
+      order: 'created_at.desc',
+    }).then((r) => parseRows(connectionDisplaySchema, r)),
+  ]);
+
+  return { account, plan, planChanges, apiKeys, connections };
 }

@@ -17,12 +17,15 @@ const input =
 export function ApiKeyForm({
   accounts,
   disabled,
+  fixedAccountId,
 }: {
   accounts: { id: string; name: string }[];
   disabled: boolean;
+  /** Quando presente, esconde o <select> de conta e usa este id fixo (ex.: /accounts/[id]). */
+  fixedAccountId?: string;
 }) {
   const router = useRouter();
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '');
+  const [accountId, setAccountId] = useState(fixedAccountId ?? accounts[0]?.id ?? '');
   const [provider, setProvider] = useState<(typeof PROVIDERS)[number]>('anthropic');
   const [key, setKey] = useState('');
   const [label, setLabel] = useState('');
@@ -77,21 +80,23 @@ export function ApiKeyForm({
       onSubmit={onSubmit}
       className="mb-4 grid gap-3 rounded-xl border border-edge/60 bg-panel/40 p-4 sm:grid-cols-2"
     >
-      <div>
-        <label className="block text-xs text-dim">Conta</label>
-        <select
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          className={input}
-          disabled={disabled}
-        >
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {fixedAccountId ? null : (
+        <div>
+          <label className="block text-xs text-dim">Conta</label>
+          <select
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            className={input}
+            disabled={disabled}
+          >
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div>
         <label className="block text-xs text-dim">Provedor</label>
         <select

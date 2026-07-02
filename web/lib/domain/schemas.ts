@@ -58,6 +58,8 @@ export const accountRowSchema = z.object({
   subscription_status: z.string(),
   is_active: z.boolean(),
   email: z.string().nullable(), // identificador de login (não-segredo); null até ter senha própria
+  trial_ends_at: ts.nullable(),
+  current_period_end: ts.nullable(),
   last_login_at: ts.nullable(),
   created_at: ts,
   updated_at: ts,
@@ -66,7 +68,7 @@ export type AccountRow = z.infer<typeof accountRowSchema>;
 
 // Projeção de DISPLAY das accounts: NUNCA inclui password_hash → o hash nunca sai do servidor.
 export const ACCOUNT_DISPLAY_COLUMNS =
-  'id,slug,name,role,plan,plan_id,subscription_status,is_active,email,last_login_at,created_at,updated_at';
+  'id,slug,name,role,plan,plan_id,subscription_status,is_active,email,trial_ends_at,current_period_end,last_login_at,created_at,updated_at';
 
 // ── Onda A — planos configuráveis ───────────────────────────────────────────────
 // public.plans — catálogo comercial. Limites null = ilimitado. features (jsonb) = flags do plano.
