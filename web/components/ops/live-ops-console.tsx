@@ -114,9 +114,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
         <div className="flex items-center gap-3">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold tracking-wider uppercase ${
-              working
-                ? 'border-pos/50 bg-pos/10 text-pos'
-                : 'border-edge/70 bg-panel/60 text-dim'
+              working ? 'border-pos/50 bg-pos/10 text-pos' : 'border-edge/70 bg-panel/60 text-dim'
             }`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${working ? 'bg-pos' : 'bg-dim'}`} />
@@ -141,7 +139,11 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
         >
           <Panel title="Core · métricas vivas">
             <div className="grid grid-cols-2 gap-2">
-              <Metric label="Campanhas" value={formatInteger(data.kpis.campaigns)} tone="text-accent" />
+              <Metric
+                label="Campanhas"
+                value={formatInteger(data.kpis.campaigns)}
+                tone="text-accent"
+              />
               <Metric label="Problemas" value={formatInteger(data.problems)} tone="text-warn" />
               <Metric label="Gasto" value={formatCents(data.kpis.spendCents)} tone="text-accent2" />
               <Metric label="Resultados" value={formatInteger(data.kpis.results)} tone="text-pos" />
@@ -149,9 +151,13 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
           </Panel>
 
           <Panel title="Tempo de sessão">
-            <p className="font-mono text-3xl font-bold tracking-widest text-glow text-accent">{uptime}</p>
+            <p className="font-mono text-3xl font-bold tracking-widest text-glow text-accent">
+              {uptime}
+            </p>
             <p className="mt-1 text-[10px] text-dim">
-              {data.snapshotAgeLabel ? `Último raio-x ${data.snapshotAgeLabel}` : 'Sem raio-x recente'}
+              {data.snapshotAgeLabel
+                ? `Último raio-x ${data.snapshotAgeLabel}`
+                : 'Sem raio-x recente'}
             </p>
           </Panel>
 
@@ -159,7 +165,8 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
             <p className="text-xs leading-relaxed text-ink/85">
               {pulse.jobs[0]
                 ? `Agente em execução: ${pulse.jobs[0].skill}${pulse.jobs[0].kind ? ` (${pulse.jobs[0].kind})` : ''}.`
-                : (data.nextStep ?? 'Sem ação pendente. Peça um raio-x ao Trafegante para começar.')}
+                : (data.nextStep ??
+                  'Sem ação pendente. Peça um raio-x ao Trafegante para começar.')}
             </p>
           </Panel>
 
@@ -189,7 +196,9 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
             Arc Reactor
           </span>
           <span className="absolute top-3 right-4 z-10 flex items-center gap-1.5 text-[9px] tracking-[0.2em] text-dim uppercase">
-            <span className={`h-1.5 w-1.5 rounded-full ${working || speaking ? 'bg-accent' : 'bg-dim'}`} />
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${working || speaking ? 'bg-accent' : 'bg-dim'}`}
+            />
             {working || speaking ? 'live' : 'idle'}
           </span>
           <VoiceOrb size="lg" state={nexus.orbState} levelRef={nexus.levelRef} busy={working} />
@@ -207,7 +216,8 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-          className="relative flex min-h-[70vh] flex-col overflow-hidden rounded-xl border border-accent/25 bg-panel/70 backdrop-blur-md glow">
+          className="relative flex min-h-[70vh] flex-col overflow-hidden rounded-xl border border-accent/25 bg-panel/70 backdrop-blur-md glow"
+        >
           <div className="flex items-center justify-between border-b border-edge/60 px-4 py-3">
             <div className="flex items-center gap-2">
               <span aria-hidden className="reactor h-5 w-5" />
@@ -382,4 +392,3 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: st
     </div>
   );
 }
-

@@ -122,7 +122,8 @@ export function NexusWidget() {
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{
-            backgroundImage: 'radial-gradient(circle at 50% 60%, rgba(56,230,255,0.08), transparent 60%)',
+            backgroundImage:
+              'radial-gradient(circle at 50% 60%, rgba(56,230,255,0.08), transparent 60%)',
           }}
         />
         <VoiceOrb size="sm" state={orbState} levelRef={levelRef} px={84} />

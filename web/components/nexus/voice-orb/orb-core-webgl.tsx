@@ -128,11 +128,7 @@ function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLSha
   return sh;
 }
 
-function link(
-  gl: WebGLRenderingContext,
-  vsSrc: string,
-  fsSrc: string,
-): WebGLProgram | null {
+function link(gl: WebGLRenderingContext, vsSrc: string, fsSrc: string): WebGLProgram | null {
   const vs = compile(gl, gl.VERTEX_SHADER, vsSrc);
   const fs = compile(gl, gl.FRAGMENT_SHADER, fsSrc);
   const prog = gl.createProgram();
@@ -168,7 +164,15 @@ export function OrbCoreFallback({ size }: { size: number }) {
         nodes.slice(i + 1).map((q, j) => {
           const d = Math.hypot(p.x - q.x, p.y - q.y);
           return d < 34 ? (
-            <line key={`${i}-${j}`} x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke="rgba(56,230,255,0.45)" strokeWidth={0.5} />
+            <line
+              key={`${i}-${j}`}
+              x1={p.x}
+              y1={p.y}
+              x2={q.x}
+              y2={q.y}
+              stroke="rgba(56,230,255,0.45)"
+              strokeWidth={0.5}
+            />
           ) : null;
         }),
       )}
@@ -207,12 +211,14 @@ export function OrbCoreWebGL({
     // Reduzir-animações NÃO remove o globo (pedido do produto): só desacelera para um movimento sutil.
     const reduce = Boolean(
       typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
     );
     const gl =
-      (canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: true }) as
-        | WebGLRenderingContext
-        | null) ?? null;
+      (canvas.getContext('webgl', {
+        alpha: true,
+        premultipliedAlpha: false,
+        antialias: true,
+      }) as WebGLRenderingContext | null) ?? null;
     if (!gl) {
       setWebgl(false);
       return;
