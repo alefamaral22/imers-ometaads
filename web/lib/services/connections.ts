@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import { selectRows, insertRows } from '../db/client';
 import {
   connectionDisplaySchema,
@@ -9,6 +10,14 @@ import {
 import { scopeEq, canManageAccount, type AccountScope } from '../multitenant/scope';
 import { sealSecret } from '../multitenant/secrets';
 import { adTokenEncKey } from '../multitenant/enc-keys';
+
+// Projeção mínima (sem cipher) usada só na resolução da conexão de um job de campanha. client_id é
+// comparado por igualdade (não precisa validar formato — valor confiável vindo do banco).
+const activeConnectionSchema = z.object({
+  meta_ad_account_id: z.string(),
+  client_id: z.string().nullable(),
+  status: z.string(),
+});
 
 /**
  * Server-side de ad_account_connections. LEITURA projeta só colunas de DISPLAY (o cipher do token
@@ -58,4 +67,30 @@ export async function createConnection(
   const first = parsed[0];
   if (!first) throw new Error('insert ad_account_connections returned no row');
   return first;
+}
+
+export type ClientConnectionTarget = { id: string; account_id: string };
+
+/**
+ * Resolve a conexão Meta ATIVA que um job de campanha deve usar (ADR 0035). A escolha é sempre
+ * explícita: usa a única conexão viável se houver exatamente uma; com zero ou mais de uma, aborta
+ * (deny-by-default — nunca escolhe implicitamente qual conta gasta). Considera as conexões da conta
+ * ligadas ao próprio cliente MAIS as de nível-conta (client_id nulo).
+ */
+export type ResolvedClientConnection =
+  | { ok: true; metaAdAccountId: string }
+  | { ok: false; reason: 'no_active_connection' | 'ambiguous' };
+
+export async function resolveClientConnection(
+  client: ClientConnectionTarget,
+): Promise<ResolvedClientConnection> {
+  const rows = await selectRows('ad_account_connections', {
+    select: 'meta_ad_account_id,client_id,status',
+    eq: { account_id: client.account_id, status: 'active' },
+  });
+  const parsed = parseRows(activeConnectionSchema, rows);
+  const usable = parsed.filter((c) => c.client_id === null || c.client_id === client.id);
+  if (usable.length === 0) return { ok: false, reason: 'no_active_connection' };
+  if (usable.length > 1) return { ok: false, reason: 'ambiguous' };
+  return { ok: true, metaAdAccountId: usable[0]!.meta_ad_account_id };
 }

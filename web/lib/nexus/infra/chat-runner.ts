@@ -13,6 +13,7 @@ import {
 } from './anthropic';
 import { enqueueJob } from './agent-jobs';
 import { getClientBySlug, listClients } from '../../services/clients';
+import { resolveClientConnection } from '../../services/connections';
 import { listAllCampaigns, listCampaignsByClient } from '../../services/campaigns';
 import {
   getLatestAnalysis,
@@ -129,6 +130,25 @@ export async function confirmAndEnqueue(input: {
   const client = pending.args.client_slug
     ? await getClientBySlug(AGENCY_SCOPE, pending.args.client_slug)
     : null;
+
+  // Jobs de campanha (ADR 0035) escrevem na Meta com o token do tenant — precisam da conta explícita.
+  // Resolve server-side (o modelo nunca escolhe qual conta gasta): usa a única conexão ativa; com
+  // zero ou mais de uma, aborta antes de enfileirar (nunca fallback implícito — SPEC §10).
+  if (pending.kind === 'create' || pending.kind === 'create_sales') {
+    if (!client) {
+      return { reply: 'Preciso saber para qual cliente é a campanha antes de criar.' };
+    }
+    const conn = await resolveClientConnection(client);
+    if (!conn.ok) {
+      const reply =
+        conn.reason === 'no_active_connection'
+          ? 'Esse cliente não tem uma conta de anúncio ativa conectada. Conecte uma antes de criar a campanha.'
+          : 'Esse cliente tem mais de uma conta de anúncio ativa. Me diga qual devo usar para criar a campanha.';
+      return { reply };
+    }
+    pending.args.meta_ad_account_id = conn.metaAdAccountId;
+  }
+
   const row = buildAgentJobRow(
     { clientId: client?.id ?? null, accountId: client?.account_id ?? null },
     pending,

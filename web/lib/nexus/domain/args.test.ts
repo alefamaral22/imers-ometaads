@@ -33,4 +33,11 @@ describe('parseJobArgs', () => {
       inputs_token: token,
     });
   });
+
+  it('accepts meta_ad_account_id na allowlist (conta Meta do job de campanha)', () => {
+    expect(parseJobArgs({ client_slug: 'x', meta_ad_account_id: 'act_1234567890' })).toEqual({
+      client_slug: 'x',
+      meta_ad_account_id: 'act_1234567890',
+    });
+  });
 });

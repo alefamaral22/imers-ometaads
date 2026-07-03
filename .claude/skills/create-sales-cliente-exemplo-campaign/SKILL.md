@@ -19,10 +19,16 @@ gotchas em SPEC-000 §10.
 - `promoted_object` com `pixel_id` + `custom_event_type='PURCHASE'`; otimização `OFFSITE_CONVERSIONS`.
 - **Reuso**: cada ad aponta para um `meta_creative_id` existente; nada de recriar criativo.
 - Idempotente: re-rodar com o mesmo stamp faz upsert por chave natural — não duplica gasto/linhas.
+- **`meta_ad_account_id` é obrigatório em `AGENT_ARGS`.** O cliente pode ter múltiplas conexões Meta
+  (ADR 0035) — a skill **nunca** escolhe implicitamente qual usar. Sem esse arg, ou sem conexão
+  `active` correspondente em `ad_account_connections` para `(account_id, meta_ad_account_id)`,
+  **aborte antes de qualquer escrita na Meta**.
 
 ## Pré-condições
 
 - Env: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`. MCP da Meta conectado. Aborte se faltar.
+- `AGENT_ARGS.meta_ad_account_id` presente e correspondente a uma conexão `active` do cliente. Aborte
+  se ausente ou se a conexão não existir/estiver `invalid`/`revoked`.
 
 ## Fluxo
 

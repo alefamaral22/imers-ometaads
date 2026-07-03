@@ -18,6 +18,7 @@ export const ALLOWED_ARG_KEYS = [
   'subdomain',
   'period', // janela do snapshot ao vivo (ex.: last_7d, last_30d) — Onda 16
   'inputs_token', // UUID dos inputs opcionais (imagens/copy) no Storage — lido pela skill de LP
+  'meta_ad_account_id', // conta Meta escolhida no confirm p/ jobs de campanha (ADR 0035) — resolvida server-side
 ] as const;
 
 export type AllowedArgKey = (typeof ALLOWED_ARG_KEYS)[number];
