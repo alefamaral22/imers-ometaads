@@ -547,12 +547,11 @@ app.get('/nexus/snapshot', async (c) => {
 });
 
 // ── Nexus (protected: auth → authz → rate limit → validation → logic) ──────────
-// Onda 15 — Nexus é ferramenta da AGÊNCIA (lê dados globais, enfileira jobs, cria campanhas): só
-// visibilidade global. cliente_usuario não acessa (o widget também some no Shell).
+// Toda conta autenticada usa o Nexus (inclusive cliente_usuario — reverte a restrição só-agência da
+// Onda 15). O escopo dos dados/ações continua limitado pela account da sessão (scopeFromClaims).
 app.use('/nexus/*', async (c, next) => {
   const claims = await apiClaims(c);
   if (!isAuthenticated(claims)) return c.json({ error: 'unauthorized' }, 401);
-  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
   const rl = await limitNexus(serverEnv(), clientIp(c));
   if (!rl.success) return c.json({ error: 'too_many_requests' }, 429);
   await next();

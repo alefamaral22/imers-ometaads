@@ -29,10 +29,12 @@ const AGENCY_NAV = [
 /** Authenticated dashboard chrome: top nav + content container. Server component. */
 export async function Shell({ children }: { children: ReactNode }) {
   const session = await readSession();
-  // Visibilidade global = a agência (super_admin/socio). Onda 14: menu Contas. Onda 15: o Nexus é
-  // ferramenta da agência — o widget some para cliente_usuario (e a API /nexus/* também os barra).
+  // Visibilidade global = a agência (super_admin/socio). Onda 14: menu Contas.
   const isAgency = session?.role === 'super_admin' || session?.role === 'socio';
   const nav = isAgency ? [...NAV, ...AGENCY_NAV] : NAV;
+  // O Trafegante (Nexus) é visível para toda conta autenticada — inclusive cliente_usuario, que
+  // são os clientes pagantes usando a plataforma (decisão pós-Onda 15: reverte a restrição só-agência).
+  const showNexus = Boolean(session);
   // Impersonação (etapa super-admin-completo): só relevante quando a sessão real é super_admin.
   const impersonating = session?.role === 'super_admin' ? await readImpersonation() : null;
   return (
@@ -81,7 +83,7 @@ export async function Shell({ children }: { children: ReactNode }) {
         </div>
       </nav>
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
-      {isAgency ? <NexusWidget /> : null}
+      {showNexus ? <NexusWidget /> : null}
     </div>
   );
 }
