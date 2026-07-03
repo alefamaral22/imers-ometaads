@@ -63,7 +63,11 @@ export default async function SettingsPage() {
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Conexões Meta</h2>
       {accountList.length > 0 ? (
-        <ConnectionForm accounts={accountList} disabled={!vaultOn} fixedAccountId={fixedAccountId} />
+        <ConnectionForm
+          accounts={accountList}
+          disabled={!vaultOn}
+          {...(fixedAccountId ? { fixedAccountId } : {})}
+        />
       ) : null}
       {!error && connections.length === 0 ? (
         <EmptyState>Nenhuma conexão Meta conectada ainda.</EmptyState>
@@ -99,7 +103,11 @@ export default async function SettingsPage() {
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Chaves de API</h2>
       {accountList.length > 0 ? (
-        <ApiKeyForm accounts={accountList} disabled={!vaultOn} fixedAccountId={fixedAccountId} />
+        <ApiKeyForm
+          accounts={accountList}
+          disabled={!vaultOn}
+          {...(fixedAccountId ? { fixedAccountId } : {})}
+        />
       ) : null}
       {!error && apiKeys.length === 0 ? (
         <EmptyState>Nenhuma chave de API cadastrada ainda.</EmptyState>
