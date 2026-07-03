@@ -3,6 +3,7 @@ import { serverEnv, isSecretsVaultEnabled } from '../../lib/env';
 import { getCurrentScope, listAccounts } from '../../lib/services/accounts';
 import { listConnections } from '../../lib/services/connections';
 import { listApiKeys } from '../../lib/services/api-keys';
+import { hasGlobalVisibility } from '../../lib/multitenant/scope';
 import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { formatDate } from '../../lib/domain/format';
@@ -17,7 +18,7 @@ function mask(last4: string | null): string {
 }
 
 export default async function SettingsPage() {
-  await requireOperator();
+  const claims = await requireOperator();
 
   const vaultOn = isSecretsVaultEnabled(serverEnv());
 
@@ -26,11 +27,20 @@ export default async function SettingsPage() {
   let apiKeys: Awaited<ReturnType<typeof listApiKeys>> = [];
   let accountName = new Map<string, string>();
   let accountList: { id: string; name: string }[] = [];
+  // cliente_usuario nunca vê a lista de outras contas: sem visibilidade global, o form usa
+  // fixedAccountId (a própria conta), sem <select> — nunca a lista completa de tenants.
+  let fixedAccountId: string | undefined;
+  const scope = await getCurrentScope();
   try {
-    const scope = await getCurrentScope();
-    const accounts = await listAccounts();
-    accountName = new Map(accounts.map((a) => [a.id, a.name]));
-    accountList = accounts.map((a) => ({ id: a.id, name: a.name }));
+    if (hasGlobalVisibility(scope)) {
+      const accounts = await listAccounts();
+      accountName = new Map(accounts.map((a) => [a.id, a.name]));
+      accountList = accounts.map((a) => ({ id: a.id, name: a.name }));
+    } else {
+      fixedAccountId = claims.sub;
+      accountList = [{ id: claims.sub, name: claims.slug }];
+      accountName = new Map([[claims.sub, claims.slug]]);
+    }
     [connections, apiKeys] = await Promise.all([listConnections(scope), listApiKeys(scope)]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
@@ -53,7 +63,7 @@ export default async function SettingsPage() {
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Conexões Meta</h2>
       {accountList.length > 0 ? (
-        <ConnectionForm accounts={accountList} disabled={!vaultOn} />
+        <ConnectionForm accounts={accountList} disabled={!vaultOn} fixedAccountId={fixedAccountId} />
       ) : null}
       {!error && connections.length === 0 ? (
         <EmptyState>Nenhuma conexão Meta conectada ainda.</EmptyState>
@@ -88,7 +98,9 @@ export default async function SettingsPage() {
       ) : null}
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Chaves de API</h2>
-      {accountList.length > 0 ? <ApiKeyForm accounts={accountList} disabled={!vaultOn} /> : null}
+      {accountList.length > 0 ? (
+        <ApiKeyForm accounts={accountList} disabled={!vaultOn} fixedAccountId={fixedAccountId} />
+      ) : null}
       {!error && apiKeys.length === 0 ? (
         <EmptyState>Nenhuma chave de API cadastrada ainda.</EmptyState>
       ) : null}
