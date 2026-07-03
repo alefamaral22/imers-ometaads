@@ -39,7 +39,7 @@ export function StatusBars({ active = false }: { active?: boolean }) {
               style={{ transformOrigin: 'bottom' }}
               animate={{ scaleY: [0.15, (0.4 + ((i * 13) % 9) / 12) * amp, 0.2, 0.9 * amp, 0.15] }}
               transition={{
-                duration: speed + ((i % 5) * 0.12),
+                duration: speed + (i % 5) * 0.12,
                 repeat: Infinity,
                 ease: 'easeInOut',
                 delay: (i % 7) * 0.06,
@@ -50,14 +50,22 @@ export function StatusBars({ active = false }: { active?: boolean }) {
       </div>
 
       <div>
-        <p className="mb-1 text-[9px] tracking-[0.2em] text-dim uppercase">Canal B · onda portadora</p>
+        <p className="mb-1 text-[9px] tracking-[0.2em] text-dim uppercase">
+          Canal B · onda portadora
+        </p>
         <div className="h-10 overflow-hidden rounded-md border border-edge/50 bg-bg/40">
           <svg viewBox="0 0 200 40" className="h-full w-full" preserveAspectRatio="none">
             <motion.g
               animate={{ x: [0, -100] }}
               transition={{ duration: speed * 2.5, repeat: Infinity, ease: 'linear' }}
             >
-              <path d={sinePath(200, 40, 4)} fill="none" stroke="#38e6ff" strokeWidth={1.5} opacity={0.8} />
+              <path
+                d={sinePath(200, 40, 4)}
+                fill="none"
+                stroke="#38e6ff"
+                strokeWidth={1.5}
+                opacity={0.8}
+              />
               <path
                 d={sinePath(200, 40, 4)}
                 fill="none"

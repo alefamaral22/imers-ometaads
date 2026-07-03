@@ -60,10 +60,32 @@ export function OrbRings({
             animate={loop({ rotate: 360 })}
             transition={{ duration: spin(48), repeat: Infinity, ease: 'linear' }}
           >
-            <circle cx={C} cy={C} r={246} fill="none" stroke="rgba(23,58,85,0.95)" strokeWidth={1.5} />
-            <circle cx={C} cy={C} r={228} fill="none" stroke="rgba(56,230,255,0.18)" strokeWidth={1} />
+            <circle
+              cx={C}
+              cy={C}
+              r={246}
+              fill="none"
+              stroke="rgba(23,58,85,0.95)"
+              strokeWidth={1.5}
+            />
+            <circle
+              cx={C}
+              cy={C}
+              r={228}
+              fill="none"
+              stroke="rgba(56,230,255,0.18)"
+              strokeWidth={1}
+            />
             {ticks(246, 96, 8).map((t) => (
-              <line key={t.key} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="rgba(56,230,255,0.4)" strokeWidth={1} />
+              <line
+                key={t.key}
+                x1={t.x1}
+                y1={t.y1}
+                x2={t.x2}
+                y2={t.y2}
+                stroke="rgba(56,230,255,0.4)"
+                strokeWidth={1}
+              />
             ))}
           </motion.g>
 
@@ -74,9 +96,28 @@ export function OrbRings({
             transition={{ duration: spin(30), repeat: Infinity, ease: 'linear' }}
           >
             {ticks(214, 12, 22).map((t) => (
-              <line key={t.key} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="rgba(56,230,255,0.55)" strokeWidth={3} strokeLinecap="round" />
+              <line
+                key={t.key}
+                x1={t.x1}
+                y1={t.y1}
+                x2={t.x2}
+                y2={t.y2}
+                stroke="rgba(56,230,255,0.55)"
+                strokeWidth={3}
+                strokeLinecap="round"
+              />
             ))}
-            <circle cx={C} cy={C} r={188} fill="none" stroke="#38e6ff" strokeWidth={1.5} strokeDasharray="1 12" opacity={0.7} filter="url(#orb-glow)" />
+            <circle
+              cx={C}
+              cy={C}
+              r={188}
+              fill="none"
+              stroke="#38e6ff"
+              strokeWidth={1.5}
+              strokeDasharray="1 12"
+              opacity={0.7}
+              filter="url(#orb-glow)"
+            />
           </motion.g>
 
           {/* blips no anel do meio — pontinhos que acendem em sequência (camada 4 do spec) */}
@@ -89,19 +130,45 @@ export function OrbRings({
                 r={2.4}
                 fill="#7df0ff"
                 animate={reduce ? {} : { opacity: hot ? [0.25, 1, 0.25] : [0.2, 0.6, 0.2] }}
-                transition={{ duration: hot ? 1.6 : 3, repeat: Infinity, ease: 'easeInOut', delay: (i / 16) * (hot ? 1.6 : 3) }}
+                transition={{
+                  duration: hot ? 1.6 : 3,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: (i / 16) * (hot ? 1.6 : 3),
+                }}
               />
             ))}
           </g>
 
           {/* anel fino de enquadramento do globo (sem bobinas — o globo neural é o herói) */}
-          <circle cx={C} cy={C} r={150} fill="none" stroke="rgba(56,230,255,0.22)" strokeWidth={1} />
-          <circle cx={C} cy={C} r={142} fill="none" stroke="rgba(56,230,255,0.10)" strokeWidth={1} />
+          <circle
+            cx={C}
+            cy={C}
+            r={150}
+            fill="none"
+            stroke="rgba(56,230,255,0.22)"
+            strokeWidth={1}
+          />
+          <circle
+            cx={C}
+            cy={C}
+            r={142}
+            fill="none"
+            stroke="rgba(56,230,255,0.10)"
+            strokeWidth={1}
+          />
         </>
       ) : (
         // miniatura: só dois anéis finos (sem ticks/sweep)
         <>
-          <circle cx={C} cy={C} r={232} fill="none" stroke="rgba(56,230,255,0.25)" strokeWidth={4} />
+          <circle
+            cx={C}
+            cy={C}
+            r={232}
+            fill="none"
+            stroke="rgba(56,230,255,0.25)"
+            strokeWidth={4}
+          />
           <motion.circle
             cx={C}
             cy={C}

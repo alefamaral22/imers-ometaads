@@ -29,9 +29,16 @@ function shortDate(iso: string): string {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(d);
 }
 
-function linePath(points: readonly SeriesPoint[], value: (p: SeriesPoint) => number, max: number): string {
+function linePath(
+  points: readonly SeriesPoint[],
+  value: (p: SeriesPoint) => number,
+  max: number,
+): string {
   return points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i, points.length).toFixed(1)} ${yAt(value(p), max).toFixed(1)}`)
+    .map(
+      (p, i) =>
+        `${i === 0 ? 'M' : 'L'} ${xAt(i, points.length).toFixed(1)} ${yAt(value(p), max).toFixed(1)}`,
+    )
     .join(' ');
 }
 
@@ -40,14 +47,33 @@ export function SpendBarChart({ series }: { series: readonly SeriesPoint[] }) {
   const n = series.length;
   const barW = n > 0 ? Math.min(28, (innerW / n) * 0.6) : 0;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Gasto por análise">
-      <line x1={PAD.left} y1={PAD.top + innerH} x2={W - PAD.right} y2={PAD.top + innerH} className="stroke-edge" strokeWidth={1} />
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-auto w-full"
+      role="img"
+      aria-label="Gasto por análise"
+    >
+      <line
+        x1={PAD.left}
+        y1={PAD.top + innerH}
+        x2={W - PAD.right}
+        y2={PAD.top + innerH}
+        className="stroke-edge"
+        strokeWidth={1}
+      />
       {series.map((p, i) => {
         const h = max > 0 ? (innerH * p.spendCents) / max : 0;
         const x = xAt(i, n) - barW / 2;
         return (
           <g key={p.at}>
-            <rect x={x} y={PAD.top + innerH - h} width={barW} height={h} rx={2} className="fill-accent/70" />
+            <rect
+              x={x}
+              y={PAD.top + innerH - h}
+              width={barW}
+              height={h}
+              rx={2}
+              className="fill-accent/70"
+            />
             <text x={xAt(i, n)} y={H - 6} textAnchor="middle" className="fill-dim text-[9px]">
               {shortDate(p.at)}
             </text>
@@ -66,14 +92,42 @@ export function CtrCpcChart({ series }: { series: readonly SeriesPoint[] }) {
   const cpcMax = Math.max(0, ...series.map((p) => p.cpcCents));
   const n = series.length;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="CTR e CPC por análise">
-      <line x1={PAD.left} y1={PAD.top + innerH} x2={W - PAD.right} y2={PAD.top + innerH} className="stroke-edge" strokeWidth={1} />
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-auto w-full"
+      role="img"
+      aria-label="CTR e CPC por análise"
+    >
+      <line
+        x1={PAD.left}
+        y1={PAD.top + innerH}
+        x2={W - PAD.right}
+        y2={PAD.top + innerH}
+        className="stroke-edge"
+        strokeWidth={1}
+      />
       {n > 0 ? (
         <>
-          <path d={linePath(series, (p) => p.ctr, ctrMax)} fill="none" className="stroke-accent" strokeWidth={2} />
-          <path d={linePath(series, (p) => p.cpcCents, cpcMax)} fill="none" className="stroke-warn" strokeWidth={2} />
+          <path
+            d={linePath(series, (p) => p.ctr, ctrMax)}
+            fill="none"
+            className="stroke-accent"
+            strokeWidth={2}
+          />
+          <path
+            d={linePath(series, (p) => p.cpcCents, cpcMax)}
+            fill="none"
+            className="stroke-warn"
+            strokeWidth={2}
+          />
           {series.map((p, i) => (
-            <text key={p.at} x={xAt(i, n)} y={H - 6} textAnchor="middle" className="fill-dim text-[9px]">
+            <text
+              key={p.at}
+              x={xAt(i, n)}
+              y={H - 6}
+              textAnchor="middle"
+              className="fill-dim text-[9px]"
+            >
               {shortDate(p.at)}
             </text>
           ))}

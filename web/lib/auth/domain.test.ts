@@ -6,6 +6,7 @@ import {
   loginInputSchema,
   sessionClaimsSchema,
   passwordMatches,
+  impersonationClaimsSchema,
 } from './domain';
 
 const ACCOUNT = {
@@ -57,5 +58,26 @@ describe('passwordMatches (legacy bootstrap)', () => {
   it('is timing-safe and case-insensitive on hex digests', () => {
     expect(passwordMatches('ABCD', 'abcd')).toBe(true);
     expect(passwordMatches('abcd', 'abce')).toBe(false);
+  });
+});
+
+describe('impersonationClaimsSchema', () => {
+  it('accepts a well-formed impersonation payload', () => {
+    const payload = {
+      actorAccountId: '11111111-1111-1111-1111-111111111111',
+      targetAccountId: '22222222-2222-2222-2222-222222222222',
+      targetSlug: 'cliente-x',
+    };
+    expect(impersonationClaimsSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it('rejects a forged/malformed payload (non-uuid ids)', () => {
+    expect(
+      impersonationClaimsSchema.safeParse({
+        actorAccountId: 'not-a-uuid',
+        targetAccountId: '22222222-2222-2222-2222-222222222222',
+        targetSlug: 'cliente-x',
+      }).success,
+    ).toBe(false);
   });
 });

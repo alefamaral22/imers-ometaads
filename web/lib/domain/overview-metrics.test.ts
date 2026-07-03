@@ -78,15 +78,34 @@ describe('aggregateKpis', () => {
   });
   it('zera derivados sem impressões (conta sem gasto)', () => {
     const k = aggregateKpis([snap({ analysisId: 'a' })]);
-    expect(k).toMatchObject({ spendCents: 0, impressions: 0, clicks: 0, ctr: 0, cpcCents: 0, cpmCents: 0 });
+    expect(k).toMatchObject({
+      spendCents: 0,
+      impressions: 0,
+      clicks: 0,
+      ctr: 0,
+      cpcCents: 0,
+      cpmCents: 0,
+    });
   });
 });
 
 describe('topCampaignsBySpend', () => {
   it('ordena por gasto desc e rotula pelo nome conhecido', () => {
     const metrics = [
-      snap({ analysisId: 'a', metaEntityId: 'c1', spendCents: 1000, impressions: 100, cpcCents: 50 }),
-      snap({ analysisId: 'a', metaEntityId: 'c2', spendCents: 3000, impressions: 200, cpcCents: 60 }),
+      snap({
+        analysisId: 'a',
+        metaEntityId: 'c1',
+        spendCents: 1000,
+        impressions: 100,
+        cpcCents: 50,
+      }),
+      snap({
+        analysisId: 'a',
+        metaEntityId: 'c2',
+        spendCents: 3000,
+        impressions: 200,
+        cpcCents: 60,
+      }),
     ];
     const top = topCampaignsBySpend(metrics, new Map([['c2', 'Campanha Dois']]), 5);
     expect(top.map((t) => t.name)).toEqual(['Campanha Dois', 'c1']);

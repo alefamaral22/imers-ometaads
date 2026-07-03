@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  endEvent,
-  extractResultError,
-  mapStreamLine,
-  startEvent,
-} from '../domain/agent-event.ts';
+import { endEvent, extractResultError, mapStreamLine, startEvent } from '../domain/agent-event.ts';
 
 const RUN = 'job-123';
 
@@ -62,7 +57,11 @@ describe('mapStreamLine', () => {
 
 describe('extractResultError', () => {
   it('extrai o texto de um result com is_error', () => {
-    const line = JSON.stringify({ type: 'result', is_error: true, result: 'Credit balance too low' });
+    const line = JSON.stringify({
+      type: 'result',
+      is_error: true,
+      result: 'Credit balance too low',
+    });
     expect(extractResultError(line)).toBe('Credit balance too low');
   });
 

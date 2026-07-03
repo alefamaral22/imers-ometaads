@@ -56,7 +56,13 @@ export function CreateLandingForm({
         const data = (await res.json()) as { clients?: ClientOption[] };
         const list = data.clients ?? [];
         setClients(list);
-        setClientSlug((cur) => cur || (list.some((c) => c.slug === defaultClientSlug) ? defaultClientSlug : (list[0]?.slug ?? '')));
+        setClientSlug(
+          (cur) =>
+            cur ||
+            (list.some((c) => c.slug === defaultClientSlug)
+              ? defaultClientSlug
+              : (list[0]?.slug ?? '')),
+        );
       } catch {
         /* degrada: sem lista, o botão fica desabilitado até haver cliente */
       }
@@ -90,11 +96,7 @@ export function CreateLandingForm({
   const hasCopy =
     headline.trim() || subheadline.trim() || ctaLabel.trim() || notes.trim() ? true : false;
   const hasContext =
-    productName.trim() ||
-    whatItSolves.trim() ||
-    offer.trim() ||
-    price.trim() ||
-    ctaValue.trim()
+    productName.trim() || whatItSolves.trim() || offer.trim() || price.trim() || ctaValue.trim()
       ? true
       : false;
   const hasInputs = images.length > 0 || hasCopy || hasContext;
@@ -114,7 +116,8 @@ export function CreateLandingForm({
     // Preço digitado em reais (ex.: 197 ou 197,50) → centavos inteiros (SPEC: dinheiro em centavos).
     if (price.trim()) {
       const cents = priceToCents(price);
-      if (cents === null) throw new Error('Preço inválido — use apenas números (ex.: 197 ou 197,50).');
+      if (cents === null)
+        throw new Error('Preço inválido — use apenas números (ex.: 197 ou 197,50).');
       fd.append('priceCents', String(cents));
     }
     if (ctaValue.trim()) {
@@ -158,6 +161,14 @@ export function CreateLandingForm({
           data.error === 'product_not_found'
             ? 'Produto não encontrado para este cliente — cadastre-o na página do cliente.'
             : 'Cliente não encontrado — cadastre-o em Clientes antes de criar a landing page.',
+        );
+        return;
+      }
+      if (res.status === 422) {
+        const data = (await res.json().catch(() => ({}))) as { limit?: number; current?: number };
+        setStatus(
+          `Limite do plano atingido (${data.current ?? '?'}/${data.limit ?? '?'} landing pages). ` +
+            'Faça upgrade do plano para criar mais.',
         );
         return;
       }

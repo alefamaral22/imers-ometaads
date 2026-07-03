@@ -47,6 +47,71 @@ export type CreateAccountRequest = z.infer<typeof createAccountSchema>;
 export const setAccountActiveSchema = z.object({ isActive: z.boolean() });
 export type SetAccountActiveRequest = z.infer<typeof setAccountActiveSchema>;
 
+// Etapa "super-admin completo" — redefinir senha de qualquer account pelo super_admin.
+export const resetAccountPasswordSchema = z.object({ password: z.string().min(8).max(256) });
+export type ResetAccountPasswordRequest = z.infer<typeof resetAccountPasswordSchema>;
+
+// Etapa "super-admin completo" — arquivar (soft, irreversível) uma account.
+export const archiveAccountSchema = z.object({ confirm: z.literal(true) });
+export type ArchiveAccountRequest = z.infer<typeof archiveAccountSchema>;
+
+/**
+ * Onda A — planos configuráveis. Money em centavos int; limites null = ilimitado. `features` é um
+ * objeto de flags curado (dado, não instrução). slug canônico como o das accounts.
+ */
+const planSlugField = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, 'slug inválido (a–z, 0–9 e hífen; 2–40 chars)');
+const nullableLimit = z.number().int().nonnegative().max(1_000_000).nullable();
+
+export const createPlanSchema = z.object({
+  slug: planSlugField,
+  name: z.string().trim().min(2).max(120),
+  priceCents: z.number().int().nonnegative().max(100_000_000).default(0),
+  currency: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{3}$/, 'moeda inválida (ISO 4217, ex.: BRL)')
+    .default('BRL'),
+  trialDays: z.number().int().nonnegative().max(365).default(0),
+  maxClients: nullableLimit.default(null),
+  maxLandingPages: nullableLimit.default(null),
+  maxCampaigns: nullableLimit.default(null),
+  maxUsers: nullableLimit.default(null),
+  features: z.record(z.string(), z.unknown()).default({}),
+  sortOrder: z.number().int().nonnegative().max(10_000).default(0),
+});
+export type CreatePlanRequest = z.infer<typeof createPlanSchema>;
+
+// Atualização: todos os campos opcionais (patch parcial). is_active permite desativar (soft-delete).
+export const updatePlanSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    priceCents: z.number().int().nonnegative().max(100_000_000),
+    currency: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{3}$/, 'moeda inválida (ISO 4217, ex.: BRL)'),
+    trialDays: z.number().int().nonnegative().max(365),
+    maxClients: nullableLimit,
+    maxLandingPages: nullableLimit,
+    maxCampaigns: nullableLimit,
+    maxUsers: nullableLimit,
+    features: z.record(z.string(), z.unknown()),
+    sortOrder: z.number().int().nonnegative().max(10_000),
+    isActive: z.boolean(),
+  })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, 'nada para atualizar');
+export type UpdatePlanRequest = z.infer<typeof updatePlanSchema>;
+
+export const assignPlanSchema = z.object({
+  planId: z.string().uuid(),
+  reason: z.string().trim().max(500).optional(),
+});
+export type AssignPlanRequest = z.infer<typeof assignPlanSchema>;
+
 // slug canônico: a–z, 0–9 e hífen; 2–40 chars (mesmo formato das accounts).
 const slugField = z
   .string()

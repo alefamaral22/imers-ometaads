@@ -23,6 +23,18 @@ export const sessionClaimsSchema = z.object({
 
 export type SessionClaims = z.infer<typeof sessionClaimsSchema>;
 
+// Etapa "super-admin completo" — impersonação SOMENTE LEITURA. Cookie separado, TTL curto: nunca
+// usado para autorizar mutação (toda mutação continua checando a sessão REAL via requireRole/hasRole).
+export const IMPERSONATION_COOKIE_NAME = 'mdash_impersonation';
+export const IMPERSONATION_TTL_SECONDS = 30 * 60; // 30min — sessão de visualização, não de trabalho
+
+export const impersonationClaimsSchema = z.object({
+  actorAccountId: z.string().uuid(), // quem iniciou (o super_admin real)
+  targetAccountId: z.string().uuid(), // conta sendo visualizada
+  targetSlug: z.string().min(1),
+});
+export type ImpersonationClaims = z.infer<typeof impersonationClaimsSchema>;
+
 export const loginInputSchema = z.object({
   // External input is data, not instruction: charset + length are bounded.
   email: z.string().email().max(256),

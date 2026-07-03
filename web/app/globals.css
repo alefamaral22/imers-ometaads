@@ -25,7 +25,8 @@
   /* Display HUD — system-only (CSP font-src 'self', sem fontes externas). Bahnschrift (Win11) é o
      condensado técnico ideal; degrada para sans geométrica do sistema. Pareado por contraste com a mono. */
   --font-display:
-    'Bahnschrift', 'Oxanium', 'DIN Next', 'Eurostile', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+    'Bahnschrift', 'Oxanium', 'DIN Next', 'Eurostile', ui-sans-serif, system-ui, 'Segoe UI',
+    sans-serif;
 
   /* Motion — saída exponencial, sem bounce/elastic (DESIGN.md §Motion). */
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
@@ -149,7 +150,12 @@ body::after {
     inset: 0;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(56, 230, 255, 0.6), rgba(42, 159, 255, 0.1) 40%, transparent 70%);
+    background: linear-gradient(
+      135deg,
+      rgba(56, 230, 255, 0.6),
+      rgba(42, 159, 255, 0.1) 40%,
+      transparent 70%
+    );
     -webkit-mask:
       linear-gradient(#000 0 0) content-box,
       linear-gradient(#000 0 0);

@@ -37,7 +37,10 @@ export const landingInputsCopySchema = z
 export type LandingInputsCopy = z.infer<typeof landingInputsCopySchema>;
 
 // Só https para links de saída (checkout/site/WhatsApp). Nunca data:/javascript: (XSS).
-const httpsUrl = z.string().url().refine((u) => u.startsWith('https://'), 'must be an https URL');
+const httpsUrl = z
+  .string()
+  .url()
+  .refine((u) => u.startsWith('https://'), 'must be an https URL');
 
 /**
  * Destino do botão de CTA escolhido no wizard. `kind` diz como a skill liga o href:

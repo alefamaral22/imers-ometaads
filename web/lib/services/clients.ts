@@ -3,6 +3,7 @@ import { selectRows, insertRows } from '../db/client';
 import { clientRowSchema, parseRows, type ClientRow } from '../domain/schemas';
 import { scopeEq, type AccountScope } from '../multitenant/scope';
 import { writeOperationLog } from './logs';
+import { assertWithinClientLimit } from './plan-enforcement';
 import type { CreateClientRequest } from '../multitenant/requests';
 
 /**
@@ -44,6 +45,7 @@ export async function createClient(
   scope: AccountScope,
   input: CreateClientRequest,
 ): Promise<ClientRow> {
+  await assertWithinClientLimit(scope, scope.accountId);
   const row = {
     account_id: scope.accountId,
     slug: input.slug,

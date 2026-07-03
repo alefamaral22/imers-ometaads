@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { requireOperator } from '../lib/auth/server';
-import { scopeFromClaims } from '../lib/multitenant/scope';
+import { readEffectiveScope } from '../lib/auth/server';
 import { listClients } from '../lib/services/clients';
 import { listAllCampaigns } from '../lib/services/campaigns';
 import { listAnalyses } from '../lib/services/analyses';
@@ -20,18 +19,16 @@ import {
   Td,
   Th,
 } from '../components/ui';
-import {
-  formatCents,
-  formatDate,
-  formatInteger,
-  formatRatioPercent,
-} from '../lib/domain/format';
+import { formatCents, formatDate, formatInteger, formatRatioPercent } from '../lib/domain/format';
 
 // Reads use the request-time service_role client; never statically prerender.
 export const dynamic = 'force-dynamic';
 
 export default async function OverviewPage() {
-  const scope = scopeFromClaims(await requireOperator());
+  const { claims, impersonating } = await readEffectiveScope();
+  const scope = impersonating
+    ? { role: 'cliente_usuario' as const, accountId: impersonating.targetAccountId }
+    : { role: claims.role, accountId: claims.sub };
 
   // The dashboard degrades gracefully when the DB is unreachable (e.g. unconfigured env in preview).
   let error: string | null = null;
@@ -113,15 +110,20 @@ export default async function OverviewPage() {
               </h2>
               <p className="mt-3 max-w-md text-xs leading-relaxed text-ink/70">
                 Abra a <span className="text-accent">Operação ao vivo</span> — painel Jarvis em tela
-                cheia com o arc reactor, métricas dos agentes e o copiloto de voz para analisar, criar
-                e ajustar campanhas em tempo real.
+                cheia com o arc reactor, métricas dos agentes e o copiloto de voz para analisar,
+                criar e ajustar campanhas em tempo real.
               </p>
               <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-[11px] font-semibold tracking-wider text-accent uppercase transition-colors group-hover:bg-accent/20">
                 Entrar no console
-                <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
+                <span aria-hidden className="transition-transform group-hover:translate-x-1">
+                  →
+                </span>
               </span>
             </div>
-            <span aria-hidden className="reactor h-32 w-32 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110" />
+            <span
+              aria-hidden
+              className="reactor h-32 w-32 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-110"
+            />
           </div>
         </Card>
       </Link>
@@ -133,12 +135,7 @@ export default async function OverviewPage() {
           <CardTitle>Resumo geral das campanhas</CardTitle>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <Stat
-            label="Campanhas WA"
-            tone="pos"
-            value={whatsapp.campaigns}
-            hint="com conversas"
-          />
+          <Stat label="Campanhas WA" tone="pos" value={whatsapp.campaigns} hint="com conversas" />
           <Stat
             label="Conversas"
             tone="accent"
@@ -215,7 +212,12 @@ export default async function OverviewPage() {
         <Stat label="Cliques" tone="accent2" value={formatInteger(kpis.clicks)} />
         <Stat label="CTR médio" tone="pos" value={formatRatioPercent(kpis.ctr)} />
         <Stat label="CPC médio" tone="warn" value={formatCents(kpis.cpcCents)} hint="por clique" />
-        <Stat label="CPM médio" tone="purple" value={formatCents(kpis.cpmCents)} hint="por mil impr." />
+        <Stat
+          label="CPM médio"
+          tone="purple"
+          value={formatCents(kpis.cpmCents)}
+          hint="por mil impr."
+        />
         <Stat label="Resultados" tone="pos" value={formatInteger(kpis.results)} />
         <Stat label="Campanhas" tone="accent" value={kpis.campaigns} hint="na última análise" />
       </div>
@@ -348,7 +350,10 @@ export default async function OverviewPage() {
           ) : (
             <ul className="divide-y divide-edge/30 text-sm">
               {logs.map((log) => (
-                <li key={log.id} className="flex items-center justify-between gap-3 py-2 first:pt-0">
+                <li
+                  key={log.id}
+                  className="flex items-center justify-between gap-3 py-2 first:pt-0"
+                >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="shrink-0 text-[9px] font-medium tracking-[0.14em] text-accent/80 uppercase">
                       {log.action}

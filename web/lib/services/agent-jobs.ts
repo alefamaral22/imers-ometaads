@@ -34,7 +34,13 @@ export async function getAgentPulse(scope: AccountScope): Promise<AgentPulse> {
     ...(eq ? { eq } : {}),
   });
   const jobs: ActiveJob[] = (Array.isArray(rows) ? rows : []).map((r) => {
-    const row = r as { id: string; skill: string; kind: string | null; status: string; created_at: string };
+    const row = r as {
+      id: string;
+      skill: string;
+      kind: string | null;
+      status: string;
+      created_at: string;
+    };
     return {
       id: row.id,
       skill: row.skill,

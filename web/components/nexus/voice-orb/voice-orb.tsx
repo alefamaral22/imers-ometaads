@@ -74,7 +74,8 @@ export function VoiceOrb({
           style={{
             background:
               'conic-gradient(from 0deg, transparent 0deg, transparent 250deg, rgba(56,230,255,0.13) 350deg, transparent 360deg)',
-            maskImage: 'radial-gradient(circle, transparent 38%, #000 40%, #000 96%, transparent 98%)',
+            maskImage:
+              'radial-gradient(circle, transparent 38%, #000 40%, #000 96%, transparent 98%)',
             WebkitMaskImage:
               'radial-gradient(circle, transparent 38%, #000 40%, #000 96%, transparent 98%)',
           }}
@@ -99,7 +100,10 @@ export function VoiceOrb({
       <OrbRings detail={detail} hot={hot} speaking={speaking} />
 
       {/* núcleo reativo (WebGL) centralizado por cima da moldura */}
-      <div className="relative flex items-center justify-center" style={{ width: coreSize, height: coreSize }}>
+      <div
+        className="relative flex items-center justify-center"
+        style={{ width: coreSize, height: coreSize }}
+      >
         <OrbCoreWebGL size={coreSize} detail={detail} levelRef={level} active={hot} />
       </div>
     </div>

@@ -39,6 +39,11 @@ export function canManageAccount(scope: AccountScope, targetAccountId: string): 
   return scope.accountId === targetAccountId;
 }
 
+/** A agência (super_admin/socio) tem visibilidade global — não é limitada por plano de tenant. */
+export function hasGlobalVisibility(scope: AccountScope): boolean {
+  return GLOBAL_VISIBILITY.has(scope.role);
+}
+
 // Onda 15 — tabelas "filhas" (campaigns/analyses/landing_pages/operation_logs) não têm account_id;
 // pertencem a um client_id, e cada cliente pertence a uma account. O escopo delas vem dos client_ids
 // da account. Esta decisão é pura/testável; o I/O (resolver os ids) fica no serviço.

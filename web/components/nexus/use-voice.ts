@@ -255,43 +255,46 @@ export function useVoice(): UseVoice {
   }, []);
 
   // ── TTS ─────────────────────────────────────────────────────────────────────
-  const speak = useCallback(async (text: string, voice?: string) => {
-    try {
-      const res = await fetch('/api/nexus/tts', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(voice ? { text, voice } : { text }),
-      });
-      if (!res.ok) return; // TTS indisponível → degrada para texto
-      const buf = await res.arrayBuffer();
-      const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
-      const audio = new Audio(url);
-      // Mede o nível da voz da IA para o orbe — mas SÓ se o contexto está tocando; senão deixa o áudio
-      // sair pelo caminho normal (rotear por Web Audio com contexto suspenso mutaria o TTS).
-      let detachMeter: (() => void) | null = null;
-      const meter = getMeter();
-      if (await meter.resume()) detachMeter = meter.meterElement(audio);
-      speakingRef.current = true;
-      setSpeaking(true);
-      // Resolve só quando o áudio TERMINA (necessário para o loop de mãos-livres retomar a escuta).
-      await new Promise<void>((resolve) => {
-        const done = () => {
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        audio.onended = done;
-        audio.onerror = done;
-        audio.play().catch(done);
-      });
-      detachMeter?.();
-    } catch {
-      // silencioso: voz é um plus, o texto já foi mostrado
-    } finally {
-      levelRef.current = 0;
-      speakingRef.current = false;
-      setSpeaking(false);
-    }
-  }, [getMeter]);
+  const speak = useCallback(
+    async (text: string, voice?: string) => {
+      try {
+        const res = await fetch('/api/nexus/tts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(voice ? { text, voice } : { text }),
+        });
+        if (!res.ok) return; // TTS indisponível → degrada para texto
+        const buf = await res.arrayBuffer();
+        const url = URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }));
+        const audio = new Audio(url);
+        // Mede o nível da voz da IA para o orbe — mas SÓ se o contexto está tocando; senão deixa o áudio
+        // sair pelo caminho normal (rotear por Web Audio com contexto suspenso mutaria o TTS).
+        let detachMeter: (() => void) | null = null;
+        const meter = getMeter();
+        if (await meter.resume()) detachMeter = meter.meterElement(audio);
+        speakingRef.current = true;
+        setSpeaking(true);
+        // Resolve só quando o áudio TERMINA (necessário para o loop de mãos-livres retomar a escuta).
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            URL.revokeObjectURL(url);
+            resolve();
+          };
+          audio.onended = done;
+          audio.onerror = done;
+          audio.play().catch(done);
+        });
+        detachMeter?.();
+      } catch {
+        // silencioso: voz é um plus, o texto já foi mostrado
+      } finally {
+        levelRef.current = 0;
+        speakingRef.current = false;
+        setSpeaking(false);
+      }
+    },
+    [getMeter],
+  );
 
   // Limpeza ao desmontar (evita mic/AudioContext vazando).
   useEffect(

@@ -174,13 +174,7 @@ export function Th({ children, right = false }: { children: ReactNode; right?: b
  * Célula. `num` alinha à direita e usa a MESMA tipografia dos KPIs (fonte display + tabular-nums),
  * para que um valor leia igual num card e numa tabela — consistência pedida no design system.
  */
-export function Td({
-  children,
-  num = false,
-}: {
-  children: ReactNode;
-  num?: boolean;
-}) {
+export function Td({ children, num = false }: { children: ReactNode; num?: boolean }) {
   return (
     <td
       className={`border-b border-edge/30 px-4 py-2.5 ${
