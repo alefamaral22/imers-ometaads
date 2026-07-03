@@ -321,7 +321,11 @@ app.post('/data/accounts/:id/impersonate', async (c) => {
   setCookie(
     c,
     IMPERSONATION_COOKIE_NAME,
-    JSON.stringify({ actorAccountId: claims.sub, targetAccountId: target.id, targetSlug: target.slug }),
+    JSON.stringify({
+      actorAccountId: claims.sub,
+      targetAccountId: target.id,
+      targetSlug: target.slug,
+    }),
     {
       httpOnly: true,
       secure: true,

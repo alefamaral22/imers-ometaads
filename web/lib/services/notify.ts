@@ -27,6 +27,9 @@ export async function notifyPasswordReset(toEmail: string, accountName: string):
       console.error(`resend ${res.status}: ${detail.slice(0, 200)} (degraded to log)`);
     }
   } catch (err) {
-    console.error('notifyPasswordReset failed (degraded):', err instanceof Error ? err.message : err);
+    console.error(
+      'notifyPasswordReset failed (degraded):',
+      err instanceof Error ? err.message : err,
+    );
   }
 }
