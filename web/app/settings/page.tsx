@@ -2,6 +2,7 @@ import { requireOperator } from '../../lib/auth/server';
 import { serverEnv, isSecretsVaultEnabled } from '../../lib/env';
 import { getCurrentScope, listAccounts } from '../../lib/services/accounts';
 import { listConnections } from '../../lib/services/connections';
+import { listClients } from '../../lib/services/clients';
 import { listApiKeys } from '../../lib/services/api-keys';
 import { hasGlobalVisibility } from '../../lib/multitenant/scope';
 import { Shell } from '../../components/shell';
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
 
   let error: string | null = null;
   let connections: Awaited<ReturnType<typeof listConnections>> = [];
+  let clients: Awaited<ReturnType<typeof listClients>> = [];
   let apiKeys: Awaited<ReturnType<typeof listApiKeys>> = [];
   let accountName = new Map<string, string>();
   let accountList: { id: string; name: string }[] = [];
@@ -44,7 +46,11 @@ export default async function SettingsPage() {
       accountList = [{ id: claims.sub, name: claims.slug }];
       accountName = new Map([[claims.sub, claims.slug]]);
     }
-    [connections, apiKeys] = await Promise.all([listConnections(scope), listApiKeys(scope)]);
+    [connections, apiKeys, clients] = await Promise.all([
+      listConnections(scope),
+      listApiKeys(scope),
+      listClients(scope),
+    ]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
   }
@@ -103,7 +109,12 @@ export default async function SettingsPage() {
                   {vaultOn ? (
                     <div className="flex items-center justify-end gap-1">
                       <SyncCampaignsButton connectionId={conn.id} />
-                      <EditConnectionButton connection={conn} />
+                      <EditConnectionButton
+                        connection={conn}
+                        clients={clients
+                          .filter((cl) => cl.account_id === conn.account_id)
+                          .map((cl) => ({ id: cl.id, name: cl.name }))}
+                      />
                       <DeleteConnectionButton connectionId={conn.id} />
                     </div>
                   ) : null}

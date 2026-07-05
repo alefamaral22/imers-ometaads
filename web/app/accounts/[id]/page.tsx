@@ -47,7 +47,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   const detail = await getAccountDetail(id);
   if (!detail) notFound();
 
-  const { account, plan, planChanges, apiKeys, connections } = detail;
+  const { account, plan, planChanges, apiKeys, connections, clients } = detail;
   const fixedAccount = [{ id: account.id, name: account.name }];
 
   return (
@@ -162,7 +162,10 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                     {vaultOn ? (
                       <div className="flex items-center justify-end gap-1">
                         <SyncCampaignsButton connectionId={conn.id} />
-                        <EditConnectionButton connection={conn} />
+                        <EditConnectionButton
+                          connection={conn}
+                          clients={clients.map((cl) => ({ id: cl.id, name: cl.name }))}
+                        />
                         <DeleteConnectionButton connectionId={conn.id} />
                       </div>
                     ) : null}

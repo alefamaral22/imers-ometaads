@@ -6,6 +6,7 @@ import {
   planRowSchema,
   connectionDisplaySchema,
   apiKeyDisplaySchema,
+  clientRowSchema,
   parseRows,
   ACCOUNT_DISPLAY_COLUMNS,
   PLAN_DISPLAY_COLUMNS,
@@ -16,6 +17,7 @@ import {
   type PlanRow,
   type ConnectionDisplay,
   type ApiKeyDisplay,
+  type ClientRow,
 } from '../domain/schemas';
 import { readSession } from '../auth/server';
 import { scopeFromClaims, type AccountScope } from '../multitenant/scope';
@@ -257,6 +259,7 @@ export interface AccountDetail {
   planChanges: PlanChangeRow[];
   apiKeys: ApiKeyDisplay[];
   connections: ConnectionDisplay[]; // pode ter mais de uma (múltiplas contas de anúncio Meta)
+  clients: ClientRow[]; // para vincular uma conexão a um cliente específico (ADR 0036)
 }
 
 /**
@@ -273,7 +276,7 @@ export async function getAccountDetail(accountId: string): Promise<AccountDetail
   const account = parseRows(accountRowSchema, rows)[0];
   if (!account) return null;
 
-  const [plan, planChanges, apiKeys, connections] = await Promise.all([
+  const [plan, planChanges, apiKeys, connections, clients] = await Promise.all([
     account.plan_id
       ? selectRows('plans', {
           select: PLAN_DISPLAY_COLUMNS,
@@ -292,7 +295,11 @@ export async function getAccountDetail(accountId: string): Promise<AccountDetail
       eq: { account_id: accountId },
       order: 'created_at.desc',
     }).then((r) => parseRows(connectionDisplaySchema, r)),
+    selectRows('clients', {
+      eq: { account_id: accountId },
+      order: 'name.asc',
+    }).then((r) => parseRows(clientRowSchema, r)),
   ]);
 
-  return { account, plan, planChanges, apiKeys, connections };
+  return { account, plan, planChanges, apiKeys, connections, clients };
 }

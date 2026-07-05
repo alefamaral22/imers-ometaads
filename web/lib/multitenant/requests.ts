@@ -24,6 +24,7 @@ export const updateConnectionSchema = z
       .regex(/^(act_)?\d{1,20}$/, 'meta ad account id inválido (use act_<digits> ou <digits>)'),
     token: z.string().min(20).max(500),
     tokenLabel: z.string().trim().max(120).nullable(),
+    clientId: z.string().uuid().nullable(),
   })
   .partial()
   .refine((o) => Object.keys(o).length > 0, 'nada para atualizar');

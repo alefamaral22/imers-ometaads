@@ -16,12 +16,19 @@ const input =
   'mt-1 w-full rounded-md border border-edge/70 bg-bg/60 px-3 py-2 text-sm outline-none focus:border-accent';
 
 /** Editar conexão: reabre um formulário preenchido. Token vem em branco — só re-envia se digitado. */
-export function EditConnectionButton({ connection }: { connection: ConnectionDisplay }) {
+export function EditConnectionButton({
+  connection,
+  clients,
+}: {
+  connection: ConnectionDisplay;
+  clients: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [metaAdAccountId, setMetaAdAccountId] = useState(connection.meta_ad_account_id);
   const [token, setToken] = useState('');
   const [tokenLabel, setTokenLabel] = useState(connection.token_label ?? '');
+  const [clientId, setClientId] = useState(connection.client_id ?? '');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -36,6 +43,7 @@ export function EditConnectionButton({ connection }: { connection: ConnectionDis
         body: JSON.stringify({
           metaAdAccountId,
           tokenLabel: tokenLabel || null,
+          clientId: clientId || null,
           ...(token ? { token } : {}),
         }),
       });
@@ -91,6 +99,27 @@ export function EditConnectionButton({ connection }: { connection: ConnectionDis
           onChange={(e) => setTokenLabel(e.target.value)}
           className={input}
         />
+      </div>
+      <div className="sm:col-span-2">
+        <label className="block text-xs text-dim">Cliente (dono das campanhas sincronizadas)</label>
+        <select
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          className={input}
+          disabled={clients.length === 0}
+        >
+          <option value="">— sem cliente vinculado —</option>
+          {clients.map((cl) => (
+            <option key={cl.id} value={cl.id}>
+              {cl.name}
+            </option>
+          ))}
+        </select>
+        {clients.length === 0 ? (
+          <p className="mt-1 text-[11px] text-dim">
+            Nenhum cliente cadastrado nesta conta ainda. Cadastre um cliente para poder vincular.
+          </p>
+        ) : null}
       </div>
       <div className="sm:col-span-2">
         <label className="block text-xs text-dim">

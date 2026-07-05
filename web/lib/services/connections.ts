@@ -73,6 +73,7 @@ export interface UpdateConnectionInput {
   metaAdAccountId?: string | undefined;
   token?: string | undefined; // se enviado, re-cifra e volta status para 'unverified'
   tokenLabel?: string | null | undefined;
+  clientId?: string | null | undefined; // vincula (ou desvincula, com null) a conexão a um cliente
 }
 
 /** Edita uma conexão existente. Trocar o token re-cifra e volta o status para 'unverified'. */
@@ -89,6 +90,7 @@ export async function updateConnection(
   const patch: Record<string, unknown> = {};
   if (input.metaAdAccountId !== undefined) patch.meta_ad_account_id = input.metaAdAccountId;
   if (input.tokenLabel !== undefined) patch.token_label = input.tokenLabel;
+  if (input.clientId !== undefined) patch.client_id = input.clientId;
   if (input.token !== undefined) {
     const sealed = sealSecret(input.token, adTokenEncKey());
     patch.access_token_cipher = sealed.cipherHex;
