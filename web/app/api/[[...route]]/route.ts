@@ -16,7 +16,12 @@ import { signSession, verifySession, sha256Hex } from '../../../lib/auth/session
 import { verifyPassword } from '../../../lib/auth/password';
 import { verifyTurnstile } from '../../../lib/auth/turnstile';
 import { limitLogin, limitNexus } from '../../../lib/ratelimit';
-import { listClients, getClientBySlug, createClient } from '../../../lib/services/clients';
+import {
+  listClients,
+  getClientBySlug,
+  getClientById,
+  createClient,
+} from '../../../lib/services/clients';
 import { listProducts, createProduct } from '../../../lib/services/products';
 import { listAllCampaigns } from '../../../lib/services/campaigns';
 import { listAnalyses, getLatestAnalysis, listFunnelEvents } from '../../../lib/services/analyses';
@@ -441,11 +446,11 @@ app.patch('/data/accounts/:id/plan', async (c) => {
   return c.json({ account });
 });
 
-// Cadastrar cliente pela UI — super_admin/socio. Nasce na account do criador (das claims, nunca texto livre).
+// Cadastrar cliente pela UI — qualquer account autenticada (cliente_usuario é o gestor de tráfego
+// pagante cadastrando os seus). Nasce na account do criador (das claims, nunca texto livre).
 app.post('/data/clients', async (c) => {
   const claims = await apiClaims(c);
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
-  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = createClientSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
@@ -460,26 +465,30 @@ app.post('/data/clients', async (c) => {
   }
 });
 
-// Produtos de um cliente (brief). Escopo garantido: o cliente precisa ser visível ao chamador.
+// Produtos de um cliente (brief). Qualquer account autenticada — o clientId precisa ser visível ao
+// escopo do chamador (cliente_usuario não lê produtos de um cliente de outra account).
 app.get('/data/products', async (c) => {
   const claims = await apiClaims(c);
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
-  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
   const clientId = c.req.query('client_id');
   if (clientId === undefined || !UUID_RE.test(clientId)) {
     return c.json({ error: 'invalid_request' }, 400);
   }
+  const client = await getClientById(scopeFromClaims(claims), clientId);
+  if (!client) return c.json({ error: 'not_found' }, 404);
   return c.json({ products: await listProducts(clientId) });
 });
 
-// Cadastrar produto (brief) — super_admin/socio. O clientId precisa pertencer ao escopo do chamador.
+// Cadastrar produto (brief) — qualquer account autenticada. O clientId precisa pertencer ao escopo
+// do chamador (cliente_usuario cadastra produto só nos SEUS clientes).
 app.post('/data/products', async (c) => {
   const claims = await apiClaims(c);
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
-  if (!hasRole(claims, ['super_admin', 'socio'])) return c.json({ error: 'forbidden' }, 403);
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = createProductSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const client = await getClientById(scopeFromClaims(claims), parsed.data.clientId);
+  if (!client) return c.json({ error: 'not_found' }, 404);
   try {
     const product = await createProduct(claims.slug, parsed.data);
     return c.json({ product }, 201);

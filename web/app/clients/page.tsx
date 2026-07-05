@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireRole } from '../../lib/auth/server';
+import { requireOperator } from '../../lib/auth/server';
 import { scopeFromClaims } from '../../lib/multitenant/scope';
 import { listClients } from '../../lib/services/clients';
 import { Shell } from '../../components/shell';
@@ -10,7 +10,9 @@ import { ClientForm } from '../../components/clients/client-form';
 export const dynamic = 'force-dynamic';
 
 export default async function ClientsPage() {
-  const claims = await requireRole(['super_admin', 'socio']);
+  // Qualquer conta autenticada gerencia os PRÓPRIOS clientes (cliente_usuario é o gestor de tráfego
+  // pagante); listClients já escopa por account_id — super_admin/socio continuam vendo tudo.
+  const claims = await requireOperator();
 
   let error: string | null = null;
   let clients: Awaited<ReturnType<typeof listClients>> = [];

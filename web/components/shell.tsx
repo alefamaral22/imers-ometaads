@@ -13,15 +13,16 @@ const ROLE_LABEL: Record<string, string> = {
 
 const NAV = [
   { href: '/', label: 'Visão geral' },
+  { href: '/clients', label: 'Clientes' },
   { href: '/analyses', label: 'Análises' },
   { href: '/funnel', label: 'Funil' },
   { href: '/landing-pages', label: 'Landing pages' },
   { href: '/settings', label: 'Conexões & chaves' },
 ] as const;
 
-// Só para papéis de visibilidade global (a agência e seus sócios): cadastro de clientes e contas.
+// Só para papéis de visibilidade global (a agência e seus sócios): cadastro de contas/planos.
+// Clientes ficou no NAV comum — é o gestor de tráfego (cliente_usuario) quem cadastra os seus.
 const AGENCY_NAV = [
-  { href: '/clients', label: 'Clientes' },
   { href: '/accounts', label: 'Contas' },
   { href: '/plans', label: 'Planos' },
 ] as const;

@@ -26,6 +26,13 @@ export async function getClientBySlug(
   return parseRows(clientRowSchema, rows)[0] ?? null;
 }
 
+/** Busca um cliente por id DENTRO do escopo — usado para validar posse antes de operar em produtos. */
+export async function getClientById(scope: AccountScope, id: string): Promise<ClientRow | null> {
+  const eq = scopeEq(scope);
+  const rows = await selectRows('clients', { eq: { id, ...(eq ?? {}) }, limit: 1 });
+  return parseRows(clientRowSchema, rows)[0] ?? null;
+}
+
 /**
  * client_ids da account — escopo das tabelas filhas (campaigns/analyses/landing_pages/logs). `null` =
  * visibilidade global (sem filtro). Lista (possivelmente vazia) = restrito àqueles clientes.
