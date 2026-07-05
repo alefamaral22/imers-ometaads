@@ -209,6 +209,67 @@ export function whatsappSummary(
   };
 }
 
+// ── Métricas "estado atual" por conta de anúncio (campaign_insights, sem depender de analysis) ──
+
+export interface CampaignInsightInput {
+  campaignId: string;
+  metaCampaignId: string | null;
+  spendCents: number;
+  impressions: number;
+  clicks: number;
+  results: number;
+  cpcCents: number | null;
+}
+
+/** Mesma forma de Kpis, mas agregada direto de campaign_insights (cliques vêm da própria Meta, não derivados). */
+export function aggregateInsightKpis(insights: readonly CampaignInsightInput[]): Kpis {
+  let spendCents = 0;
+  let impressions = 0;
+  let clicks = 0;
+  let results = 0;
+  for (const i of insights) {
+    spendCents += i.spendCents;
+    impressions += i.impressions;
+    clicks += i.clicks;
+    results += i.results;
+  }
+  return {
+    spendCents,
+    impressions,
+    clicks,
+    results,
+    ctr: impressions > 0 ? clicks / impressions : 0,
+    cpcCents: clicks > 0 ? Math.round(spendCents / clicks) : 0,
+    cpmCents: impressions > 0 ? Math.round((spendCents / impressions) * 1000) : 0,
+    campaigns: insights.length,
+  };
+}
+
+/** Top campanhas por gasto a partir de campaign_insights, rotuladas pelos nomes conhecidos. */
+export function topCampaignsByInsightSpend(
+  insights: readonly CampaignInsightInput[],
+  names: ReadonlyMap<string, string>,
+  limit = 5,
+): CampaignMetric[] {
+  return insights
+    .map((i): CampaignMetric => {
+      const id = i.metaCampaignId ?? i.campaignId;
+      return {
+        metaEntityId: id,
+        name: names.get(id) || id,
+        spendCents: i.spendCents,
+        impressions: i.impressions,
+        clicks: i.clicks,
+        results: i.results,
+        ctr: i.impressions > 0 ? i.clicks / i.impressions : 0,
+        cpcCents: i.clicks > 0 ? Math.round(i.spendCents / i.clicks) : 0,
+        cpmCents: i.impressions > 0 ? Math.round((i.spendCents / i.impressions) * 1000) : 0,
+      };
+    })
+    .sort((a, b) => b.spendCents - a.spendCents)
+    .slice(0, limit);
+}
+
 /** Série temporal: um ponto por análise (ordem cronológica), agregando seus snapshots de campanha. */
 export function spendSeries(
   analyses: readonly AnalysisRef[],

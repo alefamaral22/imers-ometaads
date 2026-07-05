@@ -32,11 +32,21 @@ export const READ_TOOLS: NexusToolDef[] = [
     name: 'get_campaigns',
     description:
       'Lista as campanhas registradas no banco da agência (nome, objetivo, status PAUSED/ACTIVE, ' +
-      'orçamento diário em centavos, meta_campaign_id). Opcional: client_slug para filtrar por cliente.',
+      'orçamento diário em centavos, meta_campaign_id) COM as métricas reais mais recentes (gasto, ' +
+      'impressões, cliques, resultados) trazidas da Meta no último sync. Use para responder perguntas ' +
+      'sobre desempenho atual sem precisar de uma análise. Opcional: client_slug para filtrar por cliente.',
     input_schema: {
       type: 'object',
       properties: { client_slug: { type: 'string', description: 'slug do cliente (opcional)' } },
     },
+  },
+  {
+    name: 'get_ad_accounts',
+    description:
+      'Lista TODAS as contas de anúncio Meta conectadas de TODOS os clientes cadastrados na agência ' +
+      '(meta_ad_account_id, cliente vinculado, status da conexão). Use para saber em qual conta de ' +
+      'anúncio subir uma campanha, ou quando o operador perguntar quais contas a agência opera.',
+    input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'get_analyses',

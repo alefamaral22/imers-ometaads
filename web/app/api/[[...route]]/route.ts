@@ -78,6 +78,7 @@ import {
   deleteConnection,
 } from '../../../lib/services/connections';
 import { syncCampaigns } from '../../../lib/services/campaign-sync';
+import { getOverviewMetricsForAdAccount } from '../../../lib/services/overview-metrics';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
 import {
@@ -589,6 +590,34 @@ app.post('/data/connections/:id/sync-campaigns', async (c) => {
   if (result.status === 'error')
     return c.json({ error: 'sync_failed', message: result.message }, 502);
   return c.json({ ok: true, imported: result.imported });
+});
+
+// Contas de anúncio Meta conectadas (para o seletor da Visão geral). Reusa listConnections — mesma
+// regra de escopo (super_admin/socio veem todas, cliente_usuario só as suas).
+app.get('/data/ad-accounts', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const scope = scopeFromClaims(claims);
+  const connections = await listConnections(scope);
+  const adAccounts = connections.map((conn) => ({
+    metaAdAccountId: conn.meta_ad_account_id,
+    label: conn.token_label ?? conn.meta_ad_account_id,
+    clientId: conn.client_id,
+    status: conn.status,
+  }));
+  return c.json({ adAccounts });
+});
+
+// Métricas "estado atual" (campaign_insights) de UMA conta de anúncio — alimenta o seletor da Visão
+// geral: ao trocar a conta, o client component chama esta rota e reconstrói os cards na hora.
+app.get('/data/overview-metrics', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const metaAdAccountId = c.req.query('metaAdAccountId');
+  if (!metaAdAccountId) return c.json({ error: 'invalid_request' }, 400);
+  const scope = scopeFromClaims(claims);
+  const metrics = await getOverviewMetricsForAdAccount(scope, metaAdAccountId);
+  return c.json({ metrics });
 });
 
 app.get('/data/api-keys', async (c) => {

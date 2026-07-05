@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { StatusBars } from './status-bars';
+import { AdAccountSelector } from './ad-account-selector';
 import { VoiceOrb } from '../nexus/voice-orb/voice-orb';
 import { useNexusChat } from '../nexus/use-nexus-chat';
 import { MINIMAX_PT_VOICES } from '../../lib/nexus/domain/tts';
@@ -65,6 +66,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
   const nexus = useNexusChat();
   const uptime = useUptime();
   const [pulse, setPulse] = useState(data.initialPulse);
+  const [kpis, setKpis] = useState(data.kpis);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Polling leve do pulso dos agentes — alimenta o efeito "trabalhando" do reactor.
@@ -112,6 +114,7 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <AdAccountSelector onChange={(next) => setKpis(next ?? data.kpis)} />
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] font-semibold tracking-wider uppercase ${
               working ? 'border-pos/50 bg-pos/10 text-pos' : 'border-edge/70 bg-panel/60 text-dim'
@@ -139,14 +142,10 @@ export function LiveOpsConsole({ data }: { data: LiveOpsData }) {
         >
           <Panel title="Core · métricas vivas">
             <div className="grid grid-cols-2 gap-2">
-              <Metric
-                label="Campanhas"
-                value={formatInteger(data.kpis.campaigns)}
-                tone="text-accent"
-              />
+              <Metric label="Campanhas" value={formatInteger(kpis.campaigns)} tone="text-accent" />
               <Metric label="Problemas" value={formatInteger(data.problems)} tone="text-warn" />
-              <Metric label="Gasto" value={formatCents(data.kpis.spendCents)} tone="text-accent2" />
-              <Metric label="Resultados" value={formatInteger(data.kpis.results)} tone="text-pos" />
+              <Metric label="Gasto" value={formatCents(kpis.spendCents)} tone="text-accent2" />
+              <Metric label="Resultados" value={formatInteger(kpis.results)} tone="text-pos" />
             </div>
           </Panel>
 

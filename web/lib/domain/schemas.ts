@@ -152,6 +152,7 @@ export const campaignRowSchema = z.object({
   id: z.string().uuid(),
   client_id: z.string().uuid(),
   meta_campaign_id: z.string().nullable(),
+  meta_ad_account_id: z.string().nullable(),
   name: z.string(),
   objective: z.string(),
   budget_mode: z.enum(['CBO', 'ABO']).nullable(),
@@ -162,6 +163,25 @@ export const campaignRowSchema = z.object({
   updated_at: ts,
 });
 export type CampaignRow = z.infer<typeof campaignRowSchema>;
+
+// public.campaign_insights — última leitura de métricas via Graph API /insights por campanha
+// (1 linha por campaign_id, upsert a cada sync). "Estado atual", não série histórica.
+export const campaignInsightRowSchema = z.object({
+  id: z.string().uuid(),
+  campaign_id: z.string().uuid(),
+  meta_ad_account_id: z.string(),
+  spend_cents: z.number(),
+  impressions: z.number(),
+  clicks: z.number(),
+  results: z.number(),
+  ctr: z.number().nullable(),
+  cpc_cents: z.number().nullable(),
+  cpm_cents: z.number().nullable(),
+  synced_at: ts,
+  created_at: ts,
+  updated_at: ts,
+});
+export type CampaignInsightRow = z.infer<typeof campaignInsightRowSchema>;
 
 // public.analyses
 export const analysisVerdict = z.enum([

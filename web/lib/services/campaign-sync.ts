@@ -4,7 +4,12 @@ import { entityStatus } from '../domain/schemas';
 import { canManageAccount, type AccountScope } from '../multitenant/scope';
 import { decryptSecret, fromPgByteaHex } from '../multitenant/secrets';
 import { adTokenEncKey } from '../multitenant/enc-keys';
-import { listCampaigns, MetaGraphError } from '../meta/graph-client';
+import {
+  listCampaigns,
+  listCampaignInsights,
+  MetaGraphError,
+  type CampaignInsight,
+} from '../meta/graph-client';
 
 interface ConnectionWithCipher {
   id: string;
@@ -92,6 +97,7 @@ export async function syncCampaigns(
   const rows = campaigns.map((c) => ({
     client_id: resolved.clientId,
     meta_campaign_id: c.id,
+    meta_ad_account_id: connection.meta_ad_account_id,
     name: c.name,
     objective: c.objective,
     status: entityStatus.safeParse(c.status).success ? c.status : 'PAUSED',
@@ -100,6 +106,17 @@ export async function syncCampaigns(
 
   if (rows.length > 0) {
     await upsertRows('campaigns', rows, 'meta_campaign_id');
+  }
+
+  // Insights ao vivo (spend/impressions/clicks/results) — não bloqueia o sync de metadados: a Meta
+  // pode não ter dado permissão de leitura de insights mesmo com o token válido para campanhas.
+  if (rows.length > 0) {
+    try {
+      const insights = await listCampaignInsights(connection.meta_ad_account_id, token);
+      await upsertCampaignInsights(resolved.clientId, connection.meta_ad_account_id, insights);
+    } catch {
+      // Best-effort: metadados já foram importados; a ausência de insights não é erro fatal do sync.
+    }
   }
 
   await patchRows(
@@ -113,4 +130,43 @@ export async function syncCampaigns(
   );
 
   return { status: 'synced', imported: rows.length };
+}
+
+/**
+ * Upsert de campaign_insights (SPEC insights-meta): resolve campaign_id local pelo meta_campaign_id
+ * (dado pela Meta é externo — nunca usamos o id da Meta como FK direta) e faz upsert 1 linha por
+ * campanha. Campanhas sem insight na Meta (ex.: nunca rodaram) simplesmente não recebem linha.
+ */
+async function upsertCampaignInsights(
+  clientId: string,
+  metaAdAccountId: string,
+  insights: readonly CampaignInsight[],
+): Promise<void> {
+  if (insights.length === 0) return;
+  const campaignRows = await selectRows('campaigns', {
+    select: 'id,meta_campaign_id',
+    eq: { client_id: clientId },
+  });
+  const idByMetaId = new Map(
+    (campaignRows as { id: string; meta_campaign_id: string | null }[])
+      .filter((c) => c.meta_campaign_id)
+      .map((c) => [c.meta_campaign_id as string, c.id]),
+  );
+  const rows = insights
+    .filter((i) => idByMetaId.has(i.campaignId))
+    .map((i) => ({
+      campaign_id: idByMetaId.get(i.campaignId),
+      meta_ad_account_id: metaAdAccountId,
+      spend_cents: i.spendCents,
+      impressions: i.impressions,
+      clicks: i.clicks,
+      results: i.results,
+      ctr: i.ctr,
+      cpc_cents: i.cpcCents,
+      cpm_cents: i.cpmCents,
+      synced_at: new Date().toISOString(),
+    }));
+  if (rows.length > 0) {
+    await upsertRows('campaign_insights', rows, 'campaign_id');
+  }
 }

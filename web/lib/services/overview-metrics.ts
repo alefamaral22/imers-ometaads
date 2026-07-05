@@ -1,15 +1,24 @@
 import 'server-only';
 import { selectRows } from '../db/client';
-import { metricSnapshotRowSchema, parseRows, type MetricSnapshotRow } from '../domain/schemas';
+import {
+  metricSnapshotRowSchema,
+  campaignInsightRowSchema,
+  campaignRowSchema,
+  parseRows,
+  type MetricSnapshotRow,
+} from '../domain/schemas';
 import type { AccountScope } from '../multitenant/scope';
 import {
   aggregateKpis,
+  aggregateInsightKpis,
   campaignSnapshots,
   latestAnalysisIdsByClient,
   spendSeries,
   topCampaignsBySpend,
+  topCampaignsByInsightSpend,
   whatsappSummary,
   type AnalysisRef,
+  type CampaignInsightInput,
   type CampaignMetric,
   type Kpis,
   type MetricInput,
@@ -18,6 +27,7 @@ import {
 } from '../domain/overview-metrics';
 import { listAnalyses } from './analyses';
 import { listAllCampaigns } from './campaigns';
+import { accountClientIds } from './clients';
 
 /**
  * View-model do painel de métricas da visão geral (SPEC-017). Lê analyses + metric_snapshots +
@@ -65,6 +75,79 @@ function toMetricInput(row: MetricSnapshotRow): MetricInput {
     cpcCents: row.cpc_cents ?? 0,
     conversations: row.conversations, // mantém null → não conta como WhatsApp
     replies: row.replies,
+  };
+}
+
+function toInsightInput(
+  row: {
+    campaign_id: string;
+    spend_cents: number;
+    impressions: number;
+    clicks: number;
+    results: number;
+    cpc_cents: number | null;
+  },
+  metaCampaignIdByCampaignId: ReadonlyMap<string, string | null>,
+): CampaignInsightInput {
+  return {
+    campaignId: row.campaign_id,
+    metaCampaignId: metaCampaignIdByCampaignId.get(row.campaign_id) ?? null,
+    spendCents: row.spend_cents,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    results: row.results,
+    cpcCents: row.cpc_cents,
+  };
+}
+
+/**
+ * Métricas "estado atual" de UMA conta de anúncio Meta, direto de campaign_insights (não depende de
+ * analysis ter rodado). Alimenta o seletor de conta na Visão geral. Escopo: só devolve dados de
+ * campanhas cujo cliente pertence à account do escopo (mesma regra de accountClientIds).
+ */
+export async function getOverviewMetricsForAdAccount(
+  scope: AccountScope,
+  metaAdAccountId: string,
+): Promise<OverviewMetrics> {
+  const campaignRows = await selectRows('campaigns', {
+    eq: { meta_ad_account_id: metaAdAccountId },
+    limit: 500,
+  });
+  const campaigns = parseRows(campaignRowSchema, campaignRows);
+  if (campaigns.length === 0) {
+    return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
+  }
+
+  const allowedClientIds = await accountClientIds(scope);
+  const scoped =
+    allowedClientIds === null
+      ? campaigns
+      : campaigns.filter((c) => allowedClientIds.includes(c.client_id));
+  if (scoped.length === 0) {
+    return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
+  }
+
+  const campaignIds = scoped.map((c) => c.id);
+  const insightRows = await selectRows('campaign_insights', {
+    in: { campaign_id: campaignIds },
+    limit: 500,
+  });
+  const insights = parseRows(campaignInsightRowSchema, insightRows);
+
+  const metaCampaignIdByCampaignId = new Map(scoped.map((c) => [c.id, c.meta_campaign_id]));
+  const names = new Map<string, string>();
+  for (const c of scoped) {
+    if (c.meta_campaign_id) names.set(c.meta_campaign_id, c.name);
+  }
+
+  const inputs = insights.map((i) => toInsightInput(i, metaCampaignIdByCampaignId));
+  const kpis = aggregateInsightKpis(inputs);
+  return {
+    kpis: { ...kpis, campaigns: scoped.length },
+    top: topCampaignsByInsightSpend(inputs, names, 5),
+    series: [],
+    whatsapp: EMPTY_WHATSAPP,
+    hasData: insights.length > 0,
   };
 }
 

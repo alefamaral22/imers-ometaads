@@ -24,6 +24,61 @@ const metaCampaignApiSchema = z.object({
 });
 export type MetaCampaignApi = z.infer<typeof metaCampaignApiSchema>;
 
+// Payload de /insights é dado de fronteira (a Meta manda strings numéricas e listas heterogêneas de
+// ações) — validado item a item antes de qualquer cálculo. `actions` cobre "results": somamos as
+// ações que representam conversão (não impressão/click, que já vêm em campos próprios).
+const metaActionApiSchema = z.object({
+  action_type: z.string(),
+  value: z.string(),
+});
+const metaInsightApiSchema = z.object({
+  campaign_id: z.string(),
+  spend: z.string().optional(),
+  impressions: z.string().optional(),
+  clicks: z.string().optional(),
+  ctr: z.string().optional(),
+  cpc: z.string().optional(),
+  cpm: z.string().optional(),
+  actions: z.array(metaActionApiSchema).optional(),
+});
+export type MetaInsightApi = z.infer<typeof metaInsightApiSchema>;
+
+// Result = soma das ações de conversão (exclui impression/link_click, que já são colunas próprias).
+const NON_RESULT_ACTION_TYPES = new Set(['impression', 'link_click', 'post_engagement']);
+
+export interface CampaignInsight {
+  campaignId: string;
+  spendCents: number;
+  impressions: number;
+  clicks: number;
+  results: number;
+  ctr: number | null;
+  cpcCents: number | null;
+  cpmCents: number | null;
+}
+
+function centsFromDecimalString(value: string | undefined): number {
+  if (!value) return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+
+function toCampaignInsight(raw: MetaInsightApi): CampaignInsight {
+  const results = (raw.actions ?? [])
+    .filter((a) => !NON_RESULT_ACTION_TYPES.has(a.action_type))
+    .reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+  return {
+    campaignId: raw.campaign_id,
+    spendCents: centsFromDecimalString(raw.spend),
+    impressions: raw.impressions ? Math.round(Number(raw.impressions)) || 0 : 0,
+    clicks: raw.clicks ? Math.round(Number(raw.clicks)) || 0 : 0,
+    results: Math.round(results),
+    ctr: raw.ctr ? Number(raw.ctr) : null,
+    cpcCents: raw.cpc ? centsFromDecimalString(raw.cpc) : null,
+    cpmCents: raw.cpm ? centsFromDecimalString(raw.cpm) : null,
+  };
+}
+
 type FetchLike = typeof fetch;
 
 function baseUrl(): string {
@@ -56,6 +111,42 @@ export async function listCampaigns(
     const json = (await res.json()) as { data?: unknown[]; paging?: { next?: string } };
     for (const raw of json.data ?? []) {
       results.push(metaCampaignApiSchema.parse(raw));
+    }
+    url = json.paging?.next;
+    pages++;
+  }
+  return results;
+}
+
+/**
+ * Lê insights (spend/impressions/clicks/results) por campanha de uma conta de anúncio (read-only).
+ * date_preset=maximum cobre a vida da campanha — o objetivo aqui é "estado atual" para os cards da
+ * Visão geral, não uma série histórica (isso já existe em metric_snapshots via funnel-analytics).
+ */
+export async function listCampaignInsights(
+  adAccountId: string,
+  token: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<CampaignInsight[]> {
+  const fields = 'campaign_id,spend,impressions,clicks,ctr,cpc,cpm,actions';
+  const results: CampaignInsight[] = [];
+  let url: string | undefined =
+    `${baseUrl()}/${adAccountId}/insights` +
+    `?level=campaign&date_preset=maximum&fields=${fields}&limit=100`;
+  let pages = 0;
+  while (url && pages < 5) {
+    const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new MetaGraphError(
+        'insights',
+        res.status,
+        `Meta Graph API ${res.status} on insights: ${detail.slice(0, 500)}`,
+      );
+    }
+    const json = (await res.json()) as { data?: unknown[]; paging?: { next?: string } };
+    for (const raw of json.data ?? []) {
+      results.push(toCampaignInsight(metaInsightApiSchema.parse(raw)));
     }
     url = json.paging?.next;
     pages++;

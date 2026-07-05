@@ -14,6 +14,7 @@ import {
 import { enqueueJob } from './agent-jobs';
 import { getClientBySlug, listClients } from '../../services/clients';
 import { listAllCampaigns, listCampaignsByClient } from '../../services/campaigns';
+import { listConnections } from '../../services/connections';
 import {
   getLatestAnalysis,
   listAnalyses,
@@ -68,6 +69,17 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
       return JSON.stringify(client ? await listCampaignsByClient(client.id) : []);
     }
     return JSON.stringify(await listAllCampaigns(AGENCY_SCOPE));
+  }
+  if (name === 'get_ad_accounts') {
+    const connections = await listConnections(AGENCY_SCOPE);
+    return JSON.stringify(
+      connections.map((c) => ({
+        meta_ad_account_id: c.meta_ad_account_id,
+        client_id: c.client_id,
+        status: c.status,
+        label: c.token_label,
+      })),
+    );
   }
   if (name === 'get_analyses') {
     if (clientSlug) {
