@@ -16,6 +16,19 @@ export const createConnectionSchema = z.object({
 });
 export type CreateConnectionRequest = z.infer<typeof createConnectionSchema>;
 
+export const updateConnectionSchema = z
+  .object({
+    metaAdAccountId: z
+      .string()
+      .trim()
+      .regex(/^(act_)?\d{1,20}$/, 'meta ad account id inválido (use act_<digits> ou <digits>)'),
+    token: z.string().min(20).max(500),
+    tokenLabel: z.string().trim().max(120).nullable(),
+  })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, 'nada para atualizar');
+export type UpdateConnectionRequest = z.infer<typeof updateConnectionSchema>;
+
 export const upsertApiKeySchema = z.object({
   accountId: z.string().uuid(),
   provider: z.enum(['anthropic', 'openai', 'elevenlabs', 'minimax', 'other']),

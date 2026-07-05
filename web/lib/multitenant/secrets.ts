@@ -3,11 +3,12 @@
 // PostgREST) — o dashboard cifra, o runner decifra; os dois precisam do mesmo formato. Mantido aqui
 // (não importado de scripts/) porque o web é um workspace deployado à parte (Vercel). Puro/CPU-only.
 
-import { randomBytes, createCipheriv } from 'node:crypto';
+import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_BYTES = 32;
 const IV_BYTES = 12;
+const TAG_BYTES = 16;
 
 export class SecretsError extends Error {
   constructor(message: string) {
@@ -38,6 +39,35 @@ export function encryptSecret(plaintext: string, key: Buffer): Buffer {
   const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
   return Buffer.concat([iv, tag, ciphertext]);
+}
+
+/**
+ * Decifra o bundle iv||tag||ciphertext (ADR 0036 §2 — o dashboard agora também lê, não só escreve).
+ * Falha fechada: GCM lança se a chave é errada ou o conteúdo foi adulterado, nunca devolve lixo.
+ */
+export function decryptSecret(blob: Buffer, key: Buffer): string {
+  if (key.length !== KEY_BYTES) throw new SecretsError(`key must be ${KEY_BYTES} bytes`);
+  if (blob.length < IV_BYTES + TAG_BYTES + 1) {
+    throw new SecretsError('ciphertext bundle is too short');
+  }
+  const iv = blob.subarray(0, IV_BYTES);
+  const tag = blob.subarray(IV_BYTES, IV_BYTES + TAG_BYTES);
+  const ciphertext = blob.subarray(IV_BYTES + TAG_BYTES);
+  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
+  try {
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+  } catch {
+    throw new SecretsError('decryption failed (tampered ciphertext or wrong key)');
+  }
+}
+
+/** Lê o bytea que o PostgREST devolve (\x<hex>) de volta para Buffer. */
+export function fromPgByteaHex(value: string): Buffer {
+  if (typeof value !== 'string' || !value.startsWith('\\x')) {
+    throw new SecretsError('expected a Postgres bytea hex literal (\\x…)');
+  }
+  return Buffer.from(value.slice(2), 'hex');
 }
 
 /** Últimos 4 caracteres do segredo, para exibir "••••abcd" no front sem revelar o resto. */

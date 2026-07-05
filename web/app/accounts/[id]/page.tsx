@@ -17,6 +17,9 @@ import {
 import { formatDate } from '../../../lib/domain/format';
 import { ApiKeyForm } from '../../../components/settings/api-key-form';
 import { ConnectionForm } from '../../../components/settings/connection-form';
+import { EditConnectionButton } from '../../../components/settings/edit-connection-button';
+import { DeleteConnectionButton } from '../../../components/settings/delete-connection-button';
+import { SyncCampaignsButton } from '../../../components/settings/sync-campaigns-button';
 import { ResetPasswordForm } from '../../../components/accounts/reset-password-form';
 import { ArchiveAccountButton } from '../../../components/accounts/archive-account-button';
 import { ImpersonateButton } from '../../../components/accounts/impersonate-button';
@@ -141,6 +144,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
               <Th>Token</Th>
               <Th>Status</Th>
               <Th>Validado</Th>
+              {isAdmin ? <Th right>Ações</Th> : null}
             </tr>
           </thead>
           <tbody>
@@ -153,6 +157,17 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                   <Badge value={conn.status} />
                 </Td>
                 <Td>{formatDate(conn.last_validated_at)}</Td>
+                {isAdmin ? (
+                  <Td>
+                    {vaultOn ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <SyncCampaignsButton connectionId={conn.id} />
+                        <EditConnectionButton connection={conn} />
+                        <DeleteConnectionButton connectionId={conn.id} />
+                      </div>
+                    ) : null}
+                  </Td>
+                ) : null}
               </tr>
             ))}
           </tbody>

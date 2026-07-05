@@ -8,6 +8,9 @@ import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { formatDate } from '../../lib/domain/format';
 import { ConnectionForm } from '../../components/settings/connection-form';
+import { EditConnectionButton } from '../../components/settings/edit-connection-button';
+import { DeleteConnectionButton } from '../../components/settings/delete-connection-button';
+import { SyncCampaignsButton } from '../../components/settings/sync-campaigns-button';
 import { ApiKeyForm } from '../../components/settings/api-key-form';
 
 export const dynamic = 'force-dynamic';
@@ -82,6 +85,7 @@ export default async function SettingsPage() {
               <Th>Token</Th>
               <Th>Status</Th>
               <Th>Validado</Th>
+              <Th right>Ações</Th>
             </tr>
           </thead>
           <tbody>
@@ -95,6 +99,15 @@ export default async function SettingsPage() {
                   <Badge value={conn.status} />
                 </Td>
                 <Td>{formatDate(conn.last_validated_at)}</Td>
+                <Td>
+                  {vaultOn ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <SyncCampaignsButton connectionId={conn.id} />
+                      <EditConnectionButton connection={conn} />
+                      <DeleteConnectionButton connectionId={conn.id} />
+                    </div>
+                  ) : null}
+                </Td>
               </tr>
             ))}
           </tbody>

@@ -66,11 +66,18 @@ import {
 } from '../../../lib/services/accounts';
 import { notifyPasswordReset } from '../../../lib/services/notify';
 import { IMPERSONATION_COOKIE_NAME, IMPERSONATION_TTL_SECONDS } from '../../../lib/auth/domain';
-import { listConnections, createConnection } from '../../../lib/services/connections';
+import {
+  listConnections,
+  createConnection,
+  updateConnection,
+  deleteConnection,
+} from '../../../lib/services/connections';
+import { syncCampaigns } from '../../../lib/services/campaign-sync';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
 import {
   createConnectionSchema,
+  updateConnectionSchema,
   upsertApiKeySchema,
   createAccountSchema,
   setAccountActiveSchema,
@@ -501,6 +508,78 @@ app.post('/data/connections', async (c) => {
   const scope = scopeFromClaims(claims);
   const connection = await createConnection(scope, parsed.data);
   return c.json({ connection }, 201);
+});
+
+app.patch('/data/connections/:id', async (c) => {
+  if (!isSecretsVaultEnabled(serverEnv())) return c.json({ error: 'vault_unconfigured' }, 503);
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = updateConnectionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const scope = scopeFromClaims(claims);
+  try {
+    const connection = await updateConnection(scope, id, parsed.data);
+    return c.json({ connection });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'not_found') {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    if (err instanceof Error && err.message.startsWith('forbidden')) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    throw err;
+  }
+});
+
+app.delete('/data/connections/:id', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const scope = scopeFromClaims(claims);
+  try {
+    await deleteConnection(scope, id);
+    return c.json({ ok: true });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'not_found') {
+      return c.json({ error: 'not_found' }, 404);
+    }
+    if (err instanceof Error && err.message.startsWith('forbidden')) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    throw err;
+  }
+});
+
+// Sincroniza campanhas da Meta para o painel (ADR 0036) — leitura read-only, síncrona (sem job),
+// resposta na hora. Nunca muta a Meta. Erro de auth marca a conexão como invalid (mesma classificação
+// do cron de validação).
+app.post('/data/connections/:id/sync-campaigns', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const scope = scopeFromClaims(claims);
+  const result = await syncCampaigns(scope, id);
+  if (result.status === 'not_found') return c.json({ error: 'not_found' }, 404);
+  if (result.status === 'forbidden') return c.json({ error: 'forbidden' }, 403);
+  if (result.status === 'client_ambiguous' || result.status === 'client_required') {
+    return c.json({ error: result.status }, 422);
+  }
+  if (result.status === 'auth_error')
+    return c.json({ error: result.status, message: result.message }, 401);
+  if (result.status === 'error')
+    return c.json({ error: 'sync_failed', message: result.message }, 502);
+  return c.json({ ok: true, imported: result.imported });
 });
 
 app.get('/data/api-keys', async (c) => {

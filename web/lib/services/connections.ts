@@ -1,5 +1,5 @@
 import 'server-only';
-import { selectRows, insertRows } from '../db/client';
+import { selectRows, insertRows, patchRows, deleteRows } from '../db/client';
 import {
   connectionDisplaySchema,
   parseRows,
@@ -58,4 +58,57 @@ export async function createConnection(
   const first = parsed[0];
   if (!first) throw new Error('insert ad_account_connections returned no row');
   return first;
+}
+
+async function getConnectionById(id: string): Promise<ConnectionDisplay | null> {
+  const rows = await selectRows('ad_account_connections', {
+    select: CONNECTION_DISPLAY_COLUMNS,
+    eq: { id },
+    limit: 1,
+  });
+  return parseRows(connectionDisplaySchema, rows)[0] ?? null;
+}
+
+export interface UpdateConnectionInput {
+  metaAdAccountId?: string | undefined;
+  token?: string | undefined; // se enviado, re-cifra e volta status para 'unverified'
+  tokenLabel?: string | null | undefined;
+}
+
+/** Edita uma conexão existente. Trocar o token re-cifra e volta o status para 'unverified'. */
+export async function updateConnection(
+  scope: AccountScope,
+  id: string,
+  input: UpdateConnectionInput,
+): Promise<ConnectionDisplay> {
+  const existing = await getConnectionById(id);
+  if (!existing) throw new Error('not_found');
+  if (!canManageAccount(scope, existing.account_id)) {
+    throw new Error('forbidden: cannot manage this account');
+  }
+  const patch: Record<string, unknown> = {};
+  if (input.metaAdAccountId !== undefined) patch.meta_ad_account_id = input.metaAdAccountId;
+  if (input.tokenLabel !== undefined) patch.token_label = input.tokenLabel;
+  if (input.token !== undefined) {
+    const sealed = sealSecret(input.token, adTokenEncKey());
+    patch.access_token_cipher = sealed.cipherHex;
+    patch.access_token_last4 = sealed.last4;
+    patch.status = 'unverified';
+    patch.last_validation_error = null;
+  }
+  const updated = await patchRows('ad_account_connections', { id }, patch);
+  const parsed = parseRows(connectionDisplaySchema, updated);
+  const first = parsed[0];
+  if (!first) throw new Error('update ad_account_connections returned no row');
+  return first;
+}
+
+/** Apaga uma conexão. Escopado por account — cliente_usuario só apaga as suas. */
+export async function deleteConnection(scope: AccountScope, id: string): Promise<void> {
+  const existing = await getConnectionById(id);
+  if (!existing) throw new Error('not_found');
+  if (!canManageAccount(scope, existing.account_id)) {
+    throw new Error('forbidden: cannot manage this account');
+  }
+  await deleteRows('ad_account_connections', { id });
 }

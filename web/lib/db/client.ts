@@ -90,3 +90,27 @@ export async function patchRows(
   });
   return Array.isArray(json) ? json : [];
 }
+
+/** Delete rows matching equality filters (server-side, service_role). */
+export async function deleteRows(table: string, eq: Record<string, string>): Promise<void> {
+  const params = new URLSearchParams();
+  for (const [col, value] of Object.entries(eq)) params.append(col, `eq.${value}`);
+  await restRequest(`${table}?${params.toString()}`, {
+    method: 'DELETE',
+    headers: { prefer: 'return=minimal' },
+  });
+}
+
+/** Upsert rows via PostgREST `on_conflict` (merge-duplicates). Returns the resulting rows. */
+export async function upsertRows(
+  table: string,
+  rows: unknown[],
+  onConflict: string,
+): Promise<unknown[]> {
+  const json = await restRequest(`${table}?on_conflict=${onConflict}`, {
+    method: 'POST',
+    headers: { prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(rows),
+  });
+  return Array.isArray(json) ? json : [];
+}
