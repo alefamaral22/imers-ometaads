@@ -579,7 +579,16 @@ app.post('/data/connections/:id/sync-campaigns', async (c) => {
     return c.json({ error: 'invalid_request' }, 400);
   }
   const scope = scopeFromClaims(claims);
-  const result = await syncCampaigns(scope, id);
+  let result;
+  try {
+    result = await syncCampaigns(scope, id);
+  } catch (err) {
+    // Defesa em profundidade: syncCampaigns já trata seus próprios erros esperados, mas qualquer
+    // falha inesperada (ex.: chave de cifra ausente/rotacionada) nunca deve virar 500 sem corpo —
+    // o front precisa de {error, message} pra mostrar a causa real, não "Não foi possível sincronizar".
+    const message = err instanceof Error ? err.message : 'erro desconhecido';
+    return c.json({ error: 'sync_failed', message }, 502);
+  }
   if (result.status === 'not_found') return c.json({ error: 'not_found' }, 404);
   if (result.status === 'forbidden') return c.json({ error: 'forbidden' }, 403);
   if (result.status === 'client_ambiguous' || result.status === 'client_required') {
@@ -675,12 +684,16 @@ app.use('/nexus/*', async (c, next) => {
 });
 
 // Chat (turno 1): texto → resposta; tools de leitura diretas; escrita PROPÕE pendência.
+// O escopo vem das claims da SESSÃO que está falando com o Nexus (não um escopo fixo de agência) —
+// cliente_usuario só recebe dados da própria account; super_admin/socio continuam vendo tudo.
 app.post('/nexus/chat', async (c) => {
+  const claims = await apiClaims(c);
+  if (!isAuthenticated(claims)) return c.json({ error: 'unauthorized' }, 401);
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = chatRequestSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
   try {
-    const result = await runChatTurn({
+    const result = await runChatTurn(scopeFromClaims(claims), {
       message: parsed.data.message,
       history: parsed.data.history ?? [],
     });
@@ -693,10 +706,12 @@ app.post('/nexus/chat', async (c) => {
 
 // Confirmação (turno 2): só aqui um job é enfileirado (escrita = só enfileira).
 app.post('/nexus/confirm', async (c) => {
+  const claims = await apiClaims(c);
+  if (!isAuthenticated(claims)) return c.json({ error: 'unauthorized' }, 401);
   const body: unknown = await c.req.json().catch(() => null);
   const parsed = confirmRequestSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
-  const result = await confirmAndEnqueue(parsed.data);
+  const result = await confirmAndEnqueue(scopeFromClaims(claims), parsed.data);
   return c.json(result);
 });
 

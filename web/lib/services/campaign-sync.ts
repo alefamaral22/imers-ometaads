@@ -74,10 +74,10 @@ export async function syncCampaigns(
   const resolved = await resolveClientId(connection);
   if (!resolved.ok) return { status: resolved.reason };
 
-  const token = decryptSecret(fromPgByteaHex(connection.access_token_cipher), adTokenEncKey());
-
+  let token: string;
   let campaigns;
   try {
+    token = decryptSecret(fromPgByteaHex(connection.access_token_cipher), adTokenEncKey());
     campaigns = await listCampaigns(connection.meta_ad_account_id, token);
   } catch (err) {
     if (err instanceof MetaGraphError && (err.httpStatus === 401 || err.httpStatus === 403)) {

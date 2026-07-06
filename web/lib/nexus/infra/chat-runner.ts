@@ -23,7 +23,7 @@ import {
 } from '../../services/analyses';
 import { getLatestSnapshot } from '../../services/live-snapshots';
 import { getRecentJobs, getLatestLanding } from '../../services/jobs';
-import { AGENCY_SCOPE } from '../../multitenant/scope';
+import type { AccountScope } from '../../multitenant/scope';
 
 // Cliente default do template quando o operador não nomeia um (há só um cadastrado).
 const DEFAULT_CLIENT_SLUG = 'cliente-exemplo';
@@ -56,22 +56,30 @@ function toolUses(content: AnthropicContentBlock[]): AnthropicToolUseBlock[] {
   return content.filter((b): b is AnthropicToolUseBlock => b.type === 'tool_use');
 }
 
-/** Executa uma tool de leitura no servidor (read-only) e devolve um JSON string como tool_result. */
-async function executeReadTool(name: string, input: Record<string, unknown>): Promise<string> {
+/**
+ * Executa uma tool de leitura no servidor (read-only) e devolve um JSON string como tool_result.
+ * `scope` é o escopo REAL da sessão que chamou o Nexus — super_admin/socio continuam vendo tudo
+ * (scopeEq retorna null pra eles), mas cliente_usuario fica restrito à própria account, exatamente
+ * como em qualquer outra leitura do dashboard. Nunca usar AGENCY_SCOPE fixo aqui.
+ */
+async function executeReadTool(
+  scope: AccountScope,
+  name: string,
+  input: Record<string, unknown>,
+): Promise<string> {
   const clientSlug = typeof input.client_slug === 'string' ? input.client_slug : undefined;
-  // Nexus já é restrito a super_admin/socio (API /nexus/*); as leituras são da agência (global scope).
   if (name === 'get_clients') {
-    return JSON.stringify(await listClients(AGENCY_SCOPE));
+    return JSON.stringify(await listClients(scope));
   }
   if (name === 'get_campaigns') {
     if (clientSlug) {
-      const client = await getClientBySlug(AGENCY_SCOPE, clientSlug);
+      const client = await getClientBySlug(scope, clientSlug);
       return JSON.stringify(client ? await listCampaignsByClient(client.id) : []);
     }
-    return JSON.stringify(await listAllCampaigns(AGENCY_SCOPE));
+    return JSON.stringify(await listAllCampaigns(scope));
   }
   if (name === 'get_ad_accounts') {
-    const connections = await listConnections(AGENCY_SCOPE);
+    const connections = await listConnections(scope);
     return JSON.stringify(
       connections.map((c) => ({
         meta_ad_account_id: c.meta_ad_account_id,
@@ -83,13 +91,13 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
   }
   if (name === 'get_analyses') {
     if (clientSlug) {
-      const client = await getClientBySlug(AGENCY_SCOPE, clientSlug);
+      const client = await getClientBySlug(scope, clientSlug);
       return JSON.stringify(client ? await listAnalysesByClient(client.id) : []);
     }
-    return JSON.stringify(await listAnalyses(AGENCY_SCOPE, 20));
+    return JSON.stringify(await listAnalyses(scope, 20));
   }
   if (name === 'get_funnel') {
-    const latest = await getLatestAnalysis(AGENCY_SCOPE);
+    const latest = await getLatestAnalysis(scope);
     return JSON.stringify(
       latest ? { analysis: latest, events: await listFunnelEvents(latest.id) } : null,
     );
@@ -97,20 +105,20 @@ async function executeReadTool(name: string, input: Record<string, unknown>): Pr
   if (name === 'get_job_status') {
     // Andamento dos pedidos recentes + estado da landing — para o Nexus narrar status/erro/link.
     const clientId = clientSlug
-      ? ((await getClientBySlug(AGENCY_SCOPE, clientSlug))?.id ?? undefined)
+      ? ((await getClientBySlug(scope, clientSlug))?.id ?? undefined)
       : undefined;
     const [jobs, landing] = await Promise.all([
-      getRecentJobs(AGENCY_SCOPE, { ...(clientId !== undefined ? { clientId } : {}), limit: 6 }),
-      getLatestLanding(AGENCY_SCOPE, clientId),
+      getRecentJobs(scope, { ...(clientId !== undefined ? { clientId } : {}), limit: 6 }),
+      getLatestLanding(scope, clientId),
     ]);
     return JSON.stringify({ jobs, landing });
   }
   if (name === 'get_live_snapshot') {
     // Lê o raio-x já PRONTO do banco (read-only). Filtra por cliente quando dado; senão o mais recente.
     const clientId = clientSlug
-      ? ((await getClientBySlug(AGENCY_SCOPE, clientSlug))?.id ?? undefined)
+      ? ((await getClientBySlug(scope, clientSlug))?.id ?? undefined)
       : undefined;
-    const snap = await getLatestSnapshot(AGENCY_SCOPE, clientId);
+    const snap = await getLatestSnapshot(scope, clientId);
     return JSON.stringify(
       snap
         ? { status: 'ready', period: snap.period, ...(snap.payload as object) }
@@ -128,18 +136,21 @@ function historyToMessages(history: Turn[]): AnthropicMessage[] {
  * Confirmação (turno 2): reconstrói a pendência a partir de slug+args+id, exige o token exato e só
  * então enfileira o job (escrita = só enfileira). Resolve client_id pelo slug quando presente.
  */
-export async function confirmAndEnqueue(input: {
-  id: string;
-  slug: string;
-  args: Record<string, string>;
-}): Promise<ChatResult> {
+export async function confirmAndEnqueue(
+  scope: AccountScope,
+  input: {
+    id: string;
+    slug: string;
+    args: Record<string, string>;
+  },
+): Promise<ChatResult> {
   const pending = buildPendingAction(input.slug, input.args, { id: input.id });
   if (pending === null) return { reply: 'Ação desconhecida — nada foi enfileirado.' };
   if (!isConfirmation(pending, input.id)) {
     return { reply: 'Confirmação inválida — nada foi enfileirado.' };
   }
   const client = pending.args.client_slug
-    ? await getClientBySlug(AGENCY_SCOPE, pending.args.client_slug)
+    ? await getClientBySlug(scope, pending.args.client_slug)
     : null;
   const row = buildAgentJobRow(
     { clientId: client?.id ?? null, accountId: client?.account_id ?? null },
@@ -182,6 +193,7 @@ function proposeWrite(tool: AnthropicToolUseBlock, leadingText: string): ChatRes
  * allowlist (slug fixo 'live-snapshot') e o montador de linha da fila. NÃO escreve na Meta.
  */
 async function requestSnapshot(
+  scope: AccountScope,
   tool: AnthropicToolUseBlock,
   leadingText: string,
 ): Promise<ChatResult> {
@@ -193,7 +205,7 @@ async function requestSnapshot(
   if (pending === null) {
     return { reply: 'Não consegui puxar os números agora.' };
   }
-  const client = await getClientBySlug(AGENCY_SCOPE, slug);
+  const client = await getClientBySlug(scope, slug);
   const result = await enqueueJob(
     buildAgentJobRow(
       { clientId: client?.id ?? null, accountId: client?.account_id ?? null },
@@ -214,10 +226,13 @@ const MAX_TOOL_ROUNDS = 5;
  * pendência, encerra para confirmação) ou responder texto (encerra). Trata TODOS os tool_use de uma
  * rodada (a Anthropic exige um tool_result por tool_use). Limite de rodadas evita laço infinito.
  */
-export async function runChatTurn(input: {
-  message: string;
-  history: Turn[];
-}): Promise<ChatResult> {
+export async function runChatTurn(
+  scope: AccountScope,
+  input: {
+    message: string;
+    history: Turn[];
+  },
+): Promise<ChatResult> {
   const system = buildSystemPrompt();
   const messages: AnthropicMessage[] = [
     ...historyToMessages(input.history),
@@ -244,7 +259,7 @@ export async function runChatTurn(input: {
     // Snapshot ao vivo: enfileira (read-only, sem confirmação) e encerra para a UI fazer polling.
     const snapshot = uses.find((u) => classifyTool(u.name) === 'snapshot');
     if (snapshot) {
-      return requestSnapshot(snapshot, text);
+      return requestSnapshot(scope, snapshot, text);
     }
 
     // Caso contrário, executa TODAS as leituras desta rodada e devolve um tool_result por tool_use.
@@ -254,7 +269,7 @@ export async function runChatTurn(input: {
         tool_use_id: u.id,
         content:
           classifyTool(u.name) === 'read'
-            ? await executeReadTool(u.name, u.input)
+            ? await executeReadTool(scope, u.name, u.input)
             : JSON.stringify({ error: 'unknown_tool' }),
       })),
     );
