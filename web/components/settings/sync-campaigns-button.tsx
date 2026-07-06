@@ -34,7 +34,14 @@ export function SyncCampaignsButton({ connectionId }: { connectionId: string }) 
       }
       const code =
         body && typeof body === 'object' && 'error' in body ? String(body.error) : 'sync_failed';
-      setMessage({ text: ERRORS[code] ?? 'Não foi possível sincronizar.', ok: false });
+      const base = ERRORS[code] ?? 'Não foi possível sincronizar.';
+      // O backend manda o motivo real em `message` (ex.: erro da Graph API, chave de cifra) —
+      // exibimos junto para o operador ver a causa, não só a mensagem genérica.
+      const detail =
+        body && typeof body === 'object' && 'message' in body && body.message
+          ? String(body.message)
+          : null;
+      setMessage({ text: detail ? `${base} (${detail})` : base, ok: false });
     } catch {
       setMessage({ text: 'Falha de rede.', ok: false });
     } finally {
