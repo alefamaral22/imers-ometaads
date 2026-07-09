@@ -346,6 +346,68 @@ export const nexusNarrationRowSchema = z.object({
 });
 export type NexusNarrationRow = z.infer<typeof nexusNarrationRowSchema>;
 
+// public.generated_images — imagem gerada por IA (DALL·E), avulsa ou anexada a um criativo.
+export const generatedImageRowSchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid().nullable(),
+  client_id: z.string().uuid().nullable(),
+  storage_bucket: z.string(),
+  storage_path: z.string(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  model: z.string().nullable(),
+  prompt: z.string().nullable(),
+  aspect: z.string().nullable(),
+  cost_usd_estimate: z.number().nullable(),
+  raw_spec: z.record(z.string(), z.unknown()).nullable().optional(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type GeneratedImageRow = z.infer<typeof generatedImageRowSchema>;
+
+// public.creatives — criativo de anúncio (imagem + copy). status = fluxo de aprovação humana;
+// source distingue quem gerou (o operador manualmente, a IA a pedido do operador, ou o Trafegante
+// autônomo criando para revisão). image_url é a URL pública (bucket ad-ingest) que a Meta busca.
+export const creativeStatus = z.enum([
+  'draft',
+  'pending_approval',
+  'approved',
+  'rejected',
+  'archived',
+]);
+export const creativeSource = z.enum(['manual', 'ai', 'trafegante']);
+export const creativeRowSchema = z.object({
+  id: z.string().uuid(),
+  account_id: z.string().uuid().nullable(),
+  client_id: z.string().uuid().nullable(),
+  meta_creative_id: z.string().nullable(),
+  name: z.string().nullable(),
+  headline: z.string().nullable(),
+  primary_text: z.string().nullable(),
+  description: z.string().nullable(),
+  call_to_action_type: z.string().nullable(),
+  link_url: z.string().nullable(),
+  image_url: z.string().nullable(),
+  page_id: z.string().nullable(),
+  generated_image_id: z.string().uuid().nullable(),
+  status: creativeStatus,
+  source: creativeSource,
+  prompt: z.string().nullable(),
+  feedback: z.string().nullable(),
+  reviewed_by: z.string().uuid().nullable(),
+  reviewed_at: ts.nullable(),
+  raw_spec: z.record(z.string(), z.unknown()).nullable().optional(),
+  created_at: ts,
+  updated_at: ts,
+});
+export type CreativeRow = z.infer<typeof creativeRowSchema>;
+
+// Projeções de DISPLAY (sem raw_spec — não é segredo, mas é ruído interno pro front).
+export const CREATIVE_COLUMNS =
+  'id,account_id,client_id,meta_creative_id,name,headline,primary_text,description,call_to_action_type,link_url,image_url,page_id,generated_image_id,status,source,prompt,feedback,reviewed_by,reviewed_at,created_at,updated_at';
+export const GENERATED_IMAGE_COLUMNS =
+  'id,account_id,client_id,storage_bucket,storage_path,width,height,model,prompt,aspect,cost_usd_estimate,created_at,updated_at';
+
 /** Parse an array of unknown rows with a row schema; throws on drift. */
 export function parseRows<T>(schema: z.ZodType<T>, rows: unknown[]): T[] {
   return rows.map((row) => schema.parse(row));

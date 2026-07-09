@@ -183,3 +183,51 @@ export const createProductSchema = z.object({
   defaultSubdomain: slugField.optional(),
 });
 export type CreateProductRequest = z.infer<typeof createProductSchema>;
+
+// ── Criativos & geração de imagem (Aba Criativos) ───────────────────────────────
+const ctaTypeField = z.string().trim().max(60);
+
+/** Cadastro manual de um criativo (sem geração de imagem — imagem já hospedada em outro lugar). */
+export const createCreativeSchema = z.object({
+  clientId: z.string().uuid(),
+  name: z.string().trim().min(2).max(200),
+  headline: z.string().trim().max(200).optional(),
+  primaryText: z.string().trim().max(2000).optional(),
+  description: z.string().trim().max(500).optional(),
+  callToActionType: ctaTypeField.optional(),
+  linkUrl: httpsUrlField.optional(),
+  imageUrl: httpsUrlField.optional(),
+});
+export type CreateCreativeRequest = z.infer<typeof createCreativeSchema>;
+
+/** Edição de um criativo existente (patch parcial) — inclui aprovar/rejeitar via `status`. */
+export const updateCreativeSchema = z
+  .object({
+    name: z.string().trim().min(2).max(200),
+    headline: z.string().trim().max(200).nullable(),
+    primaryText: z.string().trim().max(2000).nullable(),
+    description: z.string().trim().max(500).nullable(),
+    callToActionType: ctaTypeField.nullable(),
+    linkUrl: httpsUrlField.nullable(),
+    status: z.enum(['draft', 'pending_approval', 'approved', 'rejected', 'archived']),
+    feedback: z.string().trim().max(2000).nullable(),
+  })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, 'nada para atualizar');
+export type UpdateCreativeRequest = z.infer<typeof updateCreativeSchema>;
+
+/** Gera uma imagem via DALL-E (chave OpenAI da própria account) e cria o criativo com ela. */
+export const generateCreativeSchema = z.object({
+  clientId: z.string().uuid(),
+  prompt: z.string().trim().min(5).max(2000),
+  name: z.string().trim().min(2).max(200),
+  categoryId: z.string().trim().max(80).default('trafego-pago'),
+  headline: z.string().trim().max(200).optional(),
+  primaryText: z.string().trim().max(2000).optional(),
+  description: z.string().trim().max(500).optional(),
+  callToActionType: ctaTypeField.optional(),
+  linkUrl: httpsUrlField.optional(),
+  size: z.enum(['1024x1024', '1536x1024', '1024x1536']).default('1024x1024'),
+  quality: z.enum(['low', 'medium', 'high']).default('medium'),
+});
+export type GenerateCreativeRequest = z.infer<typeof generateCreativeSchema>;

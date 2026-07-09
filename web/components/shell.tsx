@@ -14,6 +14,7 @@ const ROLE_LABEL: Record<string, string> = {
 const NAV = [
   { href: '/', label: 'Visão geral' },
   { href: '/clients', label: 'Clientes' },
+  { href: '/creatives', label: 'Criativos' },
   { href: '/analyses', label: 'Análises' },
   { href: '/funnel', label: 'Funil' },
   { href: '/landing-pages', label: 'Landing pages' },

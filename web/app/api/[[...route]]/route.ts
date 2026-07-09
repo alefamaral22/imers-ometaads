@@ -88,6 +88,15 @@ import {
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
 import {
+  listCreatives,
+  getCreativeById,
+  createCreative,
+  updateCreative,
+  approveCreative,
+  rejectCreative,
+  generateCreativeImage,
+} from '../../../lib/services/creatives';
+import {
   createConnectionSchema,
   updateConnectionSchema,
   upsertApiKeySchema,
@@ -100,6 +109,9 @@ import {
   createPlanSchema,
   updatePlanSchema,
   assignPlanSchema,
+  createCreativeSchema,
+  updateCreativeSchema,
+  generateCreativeSchema,
 } from '../../../lib/multitenant/requests';
 import { scopeFromClaims } from '../../../lib/multitenant/scope';
 import { canToggleAccount } from '../../../lib/multitenant/accounts-admin';
@@ -938,6 +950,176 @@ app.post('/landing/autonomous', async (c) => {
 });
 
 app.get('/health', (c) => c.json({ ok: true }));
+
+// ── Criativos (geração IA + fluxo de aprovação) ─────────────────────────────────
+
+// Listar criativos (escopado por account). Filtros opcionais: client_id, status.
+app.get('/data/creatives', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const scope = scopeFromClaims(claims);
+  const clientId = c.req.query('client_id') || undefined;
+  const status = c.req.query('status') || undefined;
+  const creatives = await listCreatives(scope, {
+    ...(clientId ? { clientId } : {}),
+    ...(status ? { status } : {}),
+  });
+  return c.json({ creatives });
+});
+
+// Criar criativo manualmente (sem geração de imagem).
+app.post('/data/creatives', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = createCreativeSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const creative = await createCreative({
+    accountId: claims.sub,
+    clientId: parsed.data.clientId,
+    name: parsed.data.name,
+    headline: parsed.data.headline,
+    primaryText: parsed.data.primaryText,
+    description: parsed.data.description,
+    callToActionType: parsed.data.callToActionType,
+    linkUrl: parsed.data.linkUrl,
+    imageUrl: parsed.data.imageUrl,
+    source: 'manual',
+    status: 'draft',
+  });
+  return c.json({ creative }, 201);
+});
+
+// Gerar criativo com imagem via IA (usa a chave OpenAI da account do chamador).
+// Aceita JSON (sem imagens de referência) ou multipart/form-data (com imagens de referência).
+app.post('/data/creatives/generate', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+
+  let fields: Record<string, unknown> = {};
+  const refImages: { base64: string; mimeType: string }[] = [];
+
+  const ct = c.req.header('content-type') ?? '';
+  if (ct.includes('multipart/form-data')) {
+    const form = await c.req.formData();
+    fields = {
+      clientId: form.get('clientId'),
+      prompt: form.get('prompt'),
+      name: form.get('name'),
+      categoryId: form.get('categoryId') || undefined,
+      headline: form.get('headline') || undefined,
+      primaryText: form.get('primaryText') || undefined,
+      description: form.get('description') || undefined,
+      callToActionType: form.get('callToActionType') || undefined,
+      linkUrl: form.get('linkUrl') || undefined,
+      size: form.get('size') || undefined,
+      quality: form.get('quality') || undefined,
+    };
+    const images = form.getAll('images');
+    for (const img of images) {
+      if (img instanceof File && img.size > 0 && img.size <= 8_000_000) {
+        const buf = Buffer.from(await img.arrayBuffer());
+        refImages.push({ base64: buf.toString('base64'), mimeType: img.type || 'image/png' });
+      }
+    }
+  } else {
+    const body: unknown = await c.req.json().catch(() => null);
+    if (body && typeof body === 'object') fields = body as Record<string, unknown>;
+  }
+
+  const parsed = generateCreativeSchema.safeParse(fields);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const creative = await generateCreativeImage({
+      accountId: claims.sub,
+      clientId: parsed.data.clientId,
+      prompt: parsed.data.prompt,
+      name: parsed.data.name,
+      categoryId: parsed.data.categoryId,
+      referenceImages: refImages.length > 0 ? refImages : undefined,
+      headline: parsed.data.headline,
+      primaryText: parsed.data.primaryText,
+      description: parsed.data.description,
+      callToActionType: parsed.data.callToActionType,
+      linkUrl: parsed.data.linkUrl,
+      size: parsed.data.size,
+      quality: parsed.data.quality,
+    });
+    return c.json({ creative }, 201);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'erro desconhecido';
+    console.error('[POST /data/creatives/generate]', msg);
+    if (msg.startsWith('openai_key_missing'))
+      return c.json({ error: 'openai_key_missing', message: msg }, 422);
+    if (msg.startsWith('openai_key_invalid'))
+      return c.json({ error: 'openai_key_invalid', message: msg }, 422);
+    if (msg.startsWith('openai_auth_error'))
+      return c.json({ error: 'openai_auth_error', message: msg }, 401);
+    if (msg.startsWith('openai_rate_limit'))
+      return c.json({ error: 'openai_rate_limit', message: msg }, 429);
+    if (msg.startsWith('openai_error')) return c.json({ error: 'openai_error', message: msg }, 502);
+    return c.json({ error: 'internal_error', message: msg }, 500);
+  }
+});
+
+// Proxy de imagem do criativo. Evita quebra/CORS no card e permite download same-origin.
+app.get('/data/creatives/:id/image', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return c.json({ error: 'invalid_request' }, 400);
+  const creative = await getCreativeById(id);
+  if (!creative?.image_url) return c.json({ error: 'not_found' }, 404);
+
+  const res = await fetch(creative.image_url, { cache: 'no-store' });
+  if (!res.ok || !res.body) return c.json({ error: 'image_unavailable' }, 502);
+  const fileName = `${(creative.name ?? 'criativo').replace(/[^a-z0-9-_]+/gi, '-').slice(0, 60) || 'criativo'}.png`;
+  const download = c.req.query('download') === '1';
+  return new Response(res.body, {
+    status: 200,
+    headers: {
+      'content-type': res.headers.get('content-type') ?? 'image/png',
+      'cache-control': 'no-store',
+      ...(download ? { 'content-disposition': `attachment; filename="${fileName}"` } : {}),
+    },
+  });
+});
+
+// Editar criativo (inclui aprovar/rejeitar via campo `status`).
+app.patch('/data/creatives/:id', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const id = c.req.param('id');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return c.json({ error: 'invalid_request' }, 400);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = updateCreativeSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+  const existing = await getCreativeById(id);
+  if (!existing) return c.json({ error: 'not_found' }, 404);
+
+  // Se está aprovando ou rejeitando, registra quem fez
+  const data = parsed.data;
+  if (data.status === 'approved') {
+    const creative = await approveCreative(id, claims.sub);
+    return c.json({ creative });
+  }
+  if (data.status === 'rejected') {
+    const creative = await rejectCreative(id, claims.sub, data.feedback ?? undefined);
+    return c.json({ creative });
+  }
+
+  const creative = await updateCreative(id, {
+    name: data.name,
+    headline: data.headline,
+    primaryText: data.primaryText,
+    description: data.description,
+    callToActionType: data.callToActionType,
+    linkUrl: data.linkUrl,
+    status: data.status,
+    feedback: data.feedback,
+  });
+  return c.json({ creative });
+});
 
 export const GET = handle(app);
 export const POST = handle(app);
