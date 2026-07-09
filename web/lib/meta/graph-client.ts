@@ -83,7 +83,7 @@ function toCampaignInsight(raw: MetaInsightApi): CampaignInsight {
   const results = (raw.actions ?? [])
     .filter((a) => !NON_RESULT_ACTION_TYPES.has(a.action_type))
     .reduce((sum, a) => sum + (Number(a.value) || 0), 0);
-  
+
   // WhatsApp: contar conversas iniciadas e respostas
   const conversations = (raw.actions ?? [])
     .filter((a) => WHATSAPP_CONVERSATION_ACTIONS.has(a.action_type))
@@ -159,6 +159,30 @@ const metaAdAccountApiSchema = z.object({
   business_name: z.string().optional(),
 });
 export type MetaAdAccountApi = z.infer<typeof metaAdAccountApiSchema>;
+
+const metaAdAccountCurrencyApiSchema = z.object({
+  currency: z.string().optional(),
+});
+
+/** Lê a moeda da conta de anúncio (ex.: BRL, USD) para conversão de métricas. */
+export async function getAdAccountCurrency(
+  adAccountId: string,
+  token: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<string> {
+  const url = `${baseUrl()}/${adAccountId}?fields=currency`;
+  const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new MetaGraphError(
+      'adaccount_currency',
+      res.status,
+      `Meta Graph API ${res.status} on adaccount_currency: ${detail.slice(0, 500)}`,
+    );
+  }
+  const json = await res.json();
+  return metaAdAccountCurrencyApiSchema.parse(json).currency ?? 'BRL';
+}
 
 /**
  * Lista todas as contas de anúncio acessíveis pelo token (GET /me/adaccounts).

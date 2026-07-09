@@ -10,7 +10,8 @@ import {
 import { canManageAccount, type AccountScope } from '../multitenant/scope';
 import { decryptSecret, fromPgByteaHex } from '../multitenant/secrets';
 import { adTokenEncKey } from '../multitenant/enc-keys';
-import { listCampaignInsights } from '../meta/graph-client';
+import { getAdAccountCurrency, listCampaignInsights } from '../meta/graph-client';
+import { brlRateFor, convertCentsToBrl, convertNumberCentsToBrl } from './fx';
 import {
   aggregateKpis,
   aggregateInsightKpis,
@@ -68,6 +69,68 @@ const EMPTY_KPIS: Kpis = {
   campaigns: 0,
 };
 
+interface ConnectionCipherRow {
+  id: string;
+  account_id: string;
+  meta_ad_account_id: string;
+  access_token_cipher: string | null;
+  client_id: string | null;
+}
+
+async function getConnectionToken(
+  scope: AccountScope,
+  metaAdAccountId: string,
+): Promise<string | null> {
+  const connRows = await selectRows('ad_account_connections', {
+    select: 'id,account_id,meta_ad_account_id,access_token_cipher,client_id',
+    eq: { meta_ad_account_id: metaAdAccountId },
+    limit: 1,
+  });
+  const conn = (connRows as ConnectionCipherRow[])[0];
+  if (!conn || !conn.access_token_cipher || !canManageAccount(scope, conn.account_id)) return null;
+  return decryptSecret(fromPgByteaHex(conn.access_token_cipher), adTokenEncKey());
+}
+
+async function brlRateForAdAccount(scope: AccountScope, metaAdAccountId: string): Promise<number> {
+  const token = await getConnectionToken(scope, metaAdAccountId);
+  if (!token) return 1;
+  const currency = await getAdAccountCurrency(metaAdAccountId, token).catch(() => 'BRL');
+  return brlRateFor(currency);
+}
+
+function convertInsightInputToBrl(input: CampaignInsightInput, rate: number): CampaignInsightInput {
+  if (rate === 1) return input;
+  return {
+    ...input,
+    spendCents: convertNumberCentsToBrl(input.spendCents, rate),
+    cpcCents: convertCentsToBrl(input.cpcCents, rate),
+  };
+}
+
+function convertMetricInputToBrl(input: MetricInput, rate: number): MetricInput {
+  if (rate === 1) return input;
+  return {
+    ...input,
+    spendCents: convertNumberCentsToBrl(input.spendCents, rate),
+    cpcCents: convertNumberCentsToBrl(input.cpcCents, rate),
+  };
+}
+
+/**
+ * Taxas BRL por conta de anúncio Meta distinta, resolvidas em paralelo. Cada conta pode ter moeda
+ * própria (USD, EUR etc); sem isso métricas de contas estrangeiras apareceriam como se fossem BRL.
+ */
+async function brlRatesByAdAccount(
+  scope: AccountScope,
+  metaAdAccountIds: readonly string[],
+): Promise<ReadonlyMap<string, number>> {
+  const distinct = Array.from(new Set(metaAdAccountIds));
+  const entries = await Promise.all(
+    distinct.map(async (id) => [id, await brlRateForAdAccount(scope, id)] as const),
+  );
+  return new Map(entries);
+}
+
 function toMetricInput(row: MetricSnapshotRow): MetricInput {
   return {
     analysisId: row.analysis_id,
@@ -84,25 +147,26 @@ function toMetricInput(row: MetricSnapshotRow): MetricInput {
 
 function toInsightInput(
   row: {
-    campaign_id: string;
-    spend_cents: number;
-    impressions: number;
-    clicks: number;
-    results: number;
-    cpc_cents: number | null;
+    campaign_id?: string;
+    spend_cents?: number;
+    impressions?: number;
+    clicks?: number;
+    results?: number;
+    cpc_cents?: number | null;
     conversations?: number | null;
     replies?: number | null;
   },
   metaCampaignIdByCampaignId: ReadonlyMap<string, string | null>,
 ): CampaignInsightInput {
+  const campaignId = row.campaign_id ?? '';
   return {
-    campaignId: row.campaign_id,
-    metaCampaignId: metaCampaignIdByCampaignId.get(row.campaign_id) ?? null,
-    spendCents: row.spend_cents,
-    impressions: row.impressions,
-    clicks: row.clicks,
-    results: row.results,
-    cpcCents: row.cpc_cents,
+    campaignId,
+    metaCampaignId: metaCampaignIdByCampaignId.get(campaignId) ?? null,
+    spendCents: row.spend_cents ?? 0,
+    impressions: row.impressions ?? 0,
+    clicks: row.clicks ?? 0,
+    results: row.results ?? 0,
+    cpcCents: row.cpc_cents ?? null,
     conversations: row.conversations ?? null,
     replies: row.replies ?? null,
   };
@@ -148,7 +212,10 @@ export async function getOverviewMetricsForAdAccount(
     if (c.meta_campaign_id) names.set(c.meta_campaign_id, c.name);
   }
 
-  const inputs = insights.map((i) => toInsightInput(i, metaCampaignIdByCampaignId));
+  const rate = await brlRateForAdAccount(scope, metaAdAccountId);
+  const inputs = insights
+    .map((i) => toInsightInput(i, metaCampaignIdByCampaignId))
+    .map((i) => convertInsightInputToBrl(i, rate));
   const kpis = aggregateInsightKpis(inputs);
   const whatsapp = whatsappSummaryFromInsights(inputs, names, kpis.spendCents);
   return {
@@ -191,11 +258,27 @@ export async function getOverviewMetrics(
     listAllCampaigns(scope, 500),
   ]);
 
-  const metrics = parseRows(metricSnapshotRowSchema, snapshotRows).map(toMetricInput);
   const names = new Map<string, string>();
+  const adAccountByMetaCampaignId = new Map<string, string>();
   for (const c of campaigns) {
     if (c.meta_campaign_id) names.set(c.meta_campaign_id, c.name);
+    if (c.meta_campaign_id && c.meta_ad_account_id) {
+      adAccountByMetaCampaignId.set(c.meta_campaign_id, c.meta_ad_account_id);
+    }
   }
+
+  // Cada campanha pertence a uma conta de anúncio Meta com sua própria moeda; converte pra BRL
+  // antes de agregar, senão gasto em USD (por exemplo) aparece como se fosse BRL.
+  const rates = await brlRatesByAdAccount(scope, Array.from(adAccountByMetaCampaignId.values()));
+  const metrics = parseRows(metricSnapshotRowSchema, snapshotRows)
+    .map(toMetricInput)
+    .map((m) => {
+      const adAccountId = m.metaEntityId
+        ? adAccountByMetaCampaignId.get(m.metaEntityId)
+        : undefined;
+      const rate = adAccountId ? (rates.get(adAccountId) ?? 1) : 1;
+      return convertMetricInputToBrl(m, rate);
+    });
 
   const currentSnapshots = campaignSnapshots(metrics, latestAnalysisIdsByClient(analyses));
   const kpis = aggregateKpis(currentSnapshots);
@@ -225,29 +308,10 @@ export async function getOverviewMetricsForAdAccountWithDateRange(
   metaAdAccountId: string,
   dateRange: DateRange,
 ): Promise<OverviewMetrics> {
-  // 1) Acha a conexão com cipher do token
-  const connRows = await selectRows('ad_account_connections', {
-    select: 'id,account_id,meta_ad_account_id,access_token_cipher,client_id',
-    eq: { meta_ad_account_id: metaAdAccountId },
-    limit: 1,
-  });
-  const conn = (connRows as Array<{
-    id: string;
-    account_id: string;
-    meta_ad_account_id: string;
-    access_token_cipher: string | null;
-    client_id: string | null;
-  }>)[0];
-  if (!conn) return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
-  if (!canManageAccount(scope, conn.account_id)) {
+  // 1) Decifra token da conexão autorizada
+  const token = await getConnectionToken(scope, metaAdAccountId);
+  if (!token)
     return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
-  }
-  if (!conn.access_token_cipher) {
-    return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
-  }
-
-  // 2) Decifra token
-  const token = decryptSecret(fromPgByteaHex(conn.access_token_cipher), adTokenEncKey());
 
   // 3) Lista campanhas locais pra nomes
   const campaignRows = await selectRows('campaigns', {
@@ -256,9 +320,10 @@ export async function getOverviewMetricsForAdAccountWithDateRange(
   });
   const campaigns = parseRows(campaignRowSchema, campaignRows);
   const allowedClientIds = await accountClientIds(scope);
-  const scoped = allowedClientIds === null
-    ? campaigns
-    : campaigns.filter((c) => allowedClientIds.includes(c.client_id));
+  const scoped =
+    allowedClientIds === null
+      ? campaigns
+      : campaigns.filter((c) => allowedClientIds.includes(c.client_id));
 
   const names = new Map<string, string>();
   for (const c of scoped) {
@@ -268,18 +333,22 @@ export async function getOverviewMetricsForAdAccountWithDateRange(
   // 4) Busca insights da Meta com time_range
   const insights = await listCampaignInsights(metaAdAccountId, token, fetch, dateRange);
 
-  // 5) Mapeia para CampaignInsightInput
-  const inputs: CampaignInsightInput[] = insights.map((i) => ({
-    campaignId: i.campaignId,
-    metaCampaignId: i.campaignId,
-    spendCents: i.spendCents,
-    impressions: i.impressions,
-    clicks: i.clicks,
-    results: i.results,
-    cpcCents: i.cpcCents,
-    conversations: i.conversations > 0 ? i.conversations : null,
-    replies: i.replies > 0 ? i.replies : null,
-  }));
+  // 5) Mapeia para CampaignInsightInput e converte valores monetários para BRL.
+  const currency = await getAdAccountCurrency(metaAdAccountId, token).catch(() => 'BRL');
+  const rate = await brlRateFor(currency);
+  const inputs: CampaignInsightInput[] = insights
+    .map((i) => ({
+      campaignId: i.campaignId,
+      metaCampaignId: i.campaignId,
+      spendCents: i.spendCents,
+      impressions: i.impressions,
+      clicks: i.clicks,
+      results: i.results,
+      cpcCents: i.cpcCents,
+      conversations: i.conversations > 0 ? i.conversations : null,
+      replies: i.replies > 0 ? i.replies : null,
+    }))
+    .map((i) => convertInsightInputToBrl(i, rate));
 
   const kpis = aggregateInsightKpis(inputs);
   const whatsapp = whatsappSummaryFromInsights(inputs, names, kpis.spendCents);
