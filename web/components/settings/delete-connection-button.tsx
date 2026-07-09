@@ -15,16 +15,26 @@ export function DeleteConnectionButton({ connectionId }: { connectionId: string 
     setError(null);
     try {
       const res = await fetch(`/api/data/connections/${connectionId}`, { method: 'DELETE' });
-      if (res.ok) {
+      const body = await res.json().catch(() => ({}));
+      
+      // Sucesso: status 2xx OU body.ok === true
+      if (res.ok || body?.ok === true) {
+        setConfirming(false);
         router.refresh();
         return;
       }
-      setError('Não foi possível apagar.');
+      
+      if (res.status === 403) {
+        setError('Sem permissão para apagar esta conexão.');
+      } else if (res.status === 404) {
+        setError('Conexão não encontrada.');
+      } else {
+        setError(body?.message ?? body?.error ?? 'Não foi possível apagar.');
+      }
     } catch {
       setError('Falha de rede.');
     } finally {
       setPending(false);
-      setConfirming(false);
     }
   }
 

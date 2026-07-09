@@ -177,6 +177,8 @@ export const campaignInsightRowSchema = z.object({
   ctr: z.number().nullable(),
   cpc_cents: z.number().nullable(),
   cpm_cents: z.number().nullable(),
+  conversations: z.number().nullable(),
+  replies: z.number().nullable(),
   synced_at: ts,
   created_at: ts,
   updated_at: ts,

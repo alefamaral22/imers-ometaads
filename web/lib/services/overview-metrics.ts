@@ -17,6 +17,7 @@ import {
   topCampaignsBySpend,
   topCampaignsByInsightSpend,
   whatsappSummary,
+  whatsappSummaryFromInsights,
   type AnalysisRef,
   type CampaignInsightInput,
   type CampaignMetric,
@@ -86,6 +87,8 @@ function toInsightInput(
     clicks: number;
     results: number;
     cpc_cents: number | null;
+    conversations?: number | null;
+    replies?: number | null;
   },
   metaCampaignIdByCampaignId: ReadonlyMap<string, string | null>,
 ): CampaignInsightInput {
@@ -97,6 +100,8 @@ function toInsightInput(
     clicks: row.clicks,
     results: row.results,
     cpcCents: row.cpc_cents,
+    conversations: row.conversations ?? null,
+    replies: row.replies ?? null,
   };
 }
 
@@ -142,11 +147,12 @@ export async function getOverviewMetricsForAdAccount(
 
   const inputs = insights.map((i) => toInsightInput(i, metaCampaignIdByCampaignId));
   const kpis = aggregateInsightKpis(inputs);
+  const whatsapp = whatsappSummaryFromInsights(inputs, names, kpis.spendCents);
   return {
     kpis: { ...kpis, campaigns: scoped.length },
     top: topCampaignsByInsightSpend(inputs, names, 5),
     series: [],
-    whatsapp: EMPTY_WHATSAPP,
+    whatsapp,
     hasData: insights.length > 0,
   };
 }

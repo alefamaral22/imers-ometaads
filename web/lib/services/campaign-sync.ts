@@ -164,6 +164,8 @@ async function upsertCampaignInsights(
       ctr: i.ctr,
       cpc_cents: i.cpcCents,
       cpm_cents: i.cpmCents,
+      conversations: i.conversations > 0 ? i.conversations : null,
+      replies: i.replies > 0 ? i.replies : null,
       synced_at: new Date().toISOString(),
     }));
   if (rows.length > 0) {

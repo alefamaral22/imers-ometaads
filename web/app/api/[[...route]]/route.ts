@@ -78,6 +78,7 @@ import {
   deleteConnection,
 } from '../../../lib/services/connections';
 import { syncCampaigns } from '../../../lib/services/campaign-sync';
+import { listAdAccountsFromToken, MetaGraphError } from '../../../lib/meta/graph-client';
 import { getOverviewMetricsForAdAccount } from '../../../lib/services/overview-metrics';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
@@ -520,6 +521,39 @@ app.post('/data/connections', async (c) => {
   return c.json({ connection }, 201);
 });
 
+// Carrega contas de anúncio acessíveis por um token Meta (ADR 0037 — fluxo de conexão melhorado).
+// O usuário cola o token, clica "Carregar" e escolhe qual(is) conta(s) importar.
+app.post('/data/meta/load-ad-accounts', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const body: unknown = await c.req.json().catch(() => null);
+  if (!body || typeof body !== 'object' || !('token' in body) || typeof body.token !== 'string') {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  const token = body.token;
+  if (token.length < 20) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    const adAccounts = await listAdAccountsFromToken(token);
+    return c.json({
+      adAccounts: adAccounts.map((a) => ({
+        id: a.id,
+        name: a.name,
+        accountStatus: a.account_status,
+        currency: a.currency,
+        businessName: a.business_name,
+      })),
+    });
+  } catch (err) {
+    if (err instanceof MetaGraphError) {
+      if (err.httpStatus === 401 || err.httpStatus === 403) {
+        return c.json({ error: 'auth_error', message: 'Token inválido ou sem permissão.' }, 401);
+      }
+      return c.json({ error: 'meta_error', message: err.message }, 502);
+    }
+    throw err;
+  }
+});
+
 app.patch('/data/connections/:id', async (c) => {
   if (!isSecretsVaultEnabled(serverEnv())) return c.json({ error: 'vault_unconfigured' }, 503);
   const claims = await apiClaims(c);
@@ -554,10 +588,12 @@ app.delete('/data/connections/:id', async (c) => {
     return c.json({ error: 'invalid_request' }, 400);
   }
   const scope = scopeFromClaims(claims);
+  console.log('[DELETE connection]', { id, scope, claims });
   try {
     await deleteConnection(scope, id);
     return c.json({ ok: true });
   } catch (err) {
+    console.error('[DELETE connection ERROR]', { id, scope, err });
     if (err instanceof Error && err.message === 'not_found') {
       return c.json({ error: 'not_found' }, 404);
     }
@@ -882,3 +918,4 @@ app.get('/health', (c) => c.json({ ok: true }));
 export const GET = handle(app);
 export const POST = handle(app);
 export const PATCH = handle(app);
+export const DELETE = handle(app);

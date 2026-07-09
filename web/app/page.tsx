@@ -129,77 +129,8 @@ export default async function OverviewPage() {
         </Card>
       </Link>
 
-      {/* WhatsApp — resumo das campanhas de mensagem (SPEC-017). Aparece sempre; vazio até haver dado. */}
-      <Card className="rise-in mb-6" style={{ animationDelay: '60ms' }}>
-        <div className="mb-4 flex items-center gap-2">
-          <Pill tone="pos">WhatsApp</Pill>
-          <CardTitle>Resumo geral das campanhas</CardTitle>
-        </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <Stat label="Campanhas WA" tone="pos" value={whatsapp.campaigns} hint="com conversas" />
-          <Stat
-            label="Conversas"
-            tone="accent"
-            value={formatInteger(whatsapp.conversations)}
-            hint="iniciadas"
-          />
-          <Stat
-            label="Custo / conversa"
-            tone="warn"
-            value={formatCents(whatsapp.costPerConversationCents)}
-          />
-          <Stat
-            label="Msgs / conversa"
-            tone="accent2"
-            value={whatsapp.msgsPerConversation.toFixed(1)}
-            hint="respostas ÷ conversas"
-          />
-          <Stat
-            label="Gasto total WA"
-            tone="purple"
-            value={formatCents(whatsapp.spendCents)}
-            hint={`${formatRatioPercent(whatsapp.pctOfTotalSpend, 0)} do gasto`}
-          />
-        </div>
-
-        {whatsapp.rows.length === 0 ? (
-          <EmptyState>
-            Nenhuma campanha de WhatsApp ainda — aparece aqui quando uma campanha de mensagem rodar.
-          </EmptyState>
-        ) : (
-          <div className="mt-4">
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Campanha</Th>
-                  <Th right>Gasto</Th>
-                  <Th right>Conversas</Th>
-                  <Th right>Custo/conv</Th>
-                  <Th right>Respostas</Th>
-                  <Th right>Msgs/conv</Th>
-                  <Th right>CTR</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {whatsapp.rows.map((r) => (
-                  <tr key={r.metaEntityId}>
-                    <Td>{r.name}</Td>
-                    <Td num>{formatCents(r.spendCents)}</Td>
-                    <Td num>{formatInteger(r.conversations)}</Td>
-                    <Td num>{formatCents(r.costPerConversationCents)}</Td>
-                    <Td num>{formatInteger(r.replies)}</Td>
-                    <Td num>{r.msgsPerConversation.toFixed(1)}</Td>
-                    <Td num>{formatRatioPercent(r.ctr)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-        )}
-      </Card>
-
-      {/* KPIs de performance (SPEC-017) — com seletor de conta de anúncio (ADR 0037). */}
-      <OverviewKpisWithSelector initialKpis={kpis} />
+      {/* Seletor de conta + WhatsApp + KPIs (SPEC-017 / ADR 0037). */}
+      <OverviewKpisWithSelector initialKpis={kpis} initialWhatsapp={whatsapp} />
 
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat label="Clientes" value={clients.length} tone="accent2" />

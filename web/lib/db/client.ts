@@ -55,7 +55,10 @@ async function restRequest(path: string, init: RequestInit): Promise<unknown> {
     const detail = await res.text().catch(() => '');
     throw new Error(`Supabase REST ${res.status} on ${path}: ${detail.slice(0, 300)}`);
   }
-  return res.json();
+  // Handle empty responses (e.g., DELETE with return=minimal)
+  const text = await res.text();
+  if (!text) return null;
+  return JSON.parse(text);
 }
 
 /** Read rows from a table/view. Returns the raw JSON array (validated by the caller's schema). */

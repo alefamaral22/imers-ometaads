@@ -43,6 +43,19 @@ const metaInsightApiSchema = z.object({
 });
 export type MetaInsightApi = z.infer<typeof metaInsightApiSchema>;
 
+// Tipos de ação que contam como "conversa iniciada" em campanhas de WhatsApp
+const WHATSAPP_CONVERSATION_ACTIONS = new Set([
+  'onsite_conversion.messaging_conversation_started_7d',
+  'onsite_conversion.messaging_first_reply',
+  'messaging_conversation_started_7d',
+]);
+
+// Tipos de ação que contam como "respostas" em campanhas de WhatsApp
+const WHATSAPP_REPLY_ACTIONS = new Set([
+  'onsite_conversion.messaging_first_reply',
+  'messaging_first_reply',
+]);
+
 // Result = soma das ações de conversão (exclui impression/link_click, que já são colunas próprias).
 const NON_RESULT_ACTION_TYPES = new Set(['impression', 'link_click', 'post_engagement']);
 
@@ -55,6 +68,9 @@ export interface CampaignInsight {
   ctr: number | null;
   cpcCents: number | null;
   cpmCents: number | null;
+  // WhatsApp metrics
+  conversations: number;
+  replies: number;
 }
 
 function centsFromDecimalString(value: string | undefined): number {
@@ -67,6 +83,15 @@ function toCampaignInsight(raw: MetaInsightApi): CampaignInsight {
   const results = (raw.actions ?? [])
     .filter((a) => !NON_RESULT_ACTION_TYPES.has(a.action_type))
     .reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+  
+  // WhatsApp: contar conversas iniciadas e respostas
+  const conversations = (raw.actions ?? [])
+    .filter((a) => WHATSAPP_CONVERSATION_ACTIONS.has(a.action_type))
+    .reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+  const replies = (raw.actions ?? [])
+    .filter((a) => WHATSAPP_REPLY_ACTIONS.has(a.action_type))
+    .reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+
   return {
     campaignId: raw.campaign_id,
     spendCents: centsFromDecimalString(raw.spend),
@@ -76,6 +101,8 @@ function toCampaignInsight(raw: MetaInsightApi): CampaignInsight {
     ctr: raw.ctr ? Number(raw.ctr) : null,
     cpcCents: raw.cpc ? centsFromDecimalString(raw.cpc) : null,
     cpmCents: raw.cpm ? centsFromDecimalString(raw.cpm) : null,
+    conversations: Math.round(conversations),
+    replies: Math.round(replies),
   };
 }
 
@@ -123,6 +150,48 @@ export async function listCampaigns(
  * date_preset=maximum cobre a vida da campanha — o objetivo aqui é "estado atual" para os cards da
  * Visão geral, não uma série histórica (isso já existe em metric_snapshots via funnel-analytics).
  */
+// Schema para contas de anúncio retornadas por /me/adaccounts
+const metaAdAccountApiSchema = z.object({
+  id: z.string(), // formato "act_123456789"
+  name: z.string(),
+  account_status: z.number().optional(),
+  currency: z.string().optional(),
+  business_name: z.string().optional(),
+});
+export type MetaAdAccountApi = z.infer<typeof metaAdAccountApiSchema>;
+
+/**
+ * Lista todas as contas de anúncio acessíveis pelo token (GET /me/adaccounts).
+ * Útil para o fluxo de conexão: o usuário cola o token, clica em "Carregar" e escolhe qual conta importar.
+ */
+export async function listAdAccountsFromToken(
+  token: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<MetaAdAccountApi[]> {
+  const fields = 'id,name,account_status,currency,business_name';
+  const results: MetaAdAccountApi[] = [];
+  let url: string | undefined = `${baseUrl()}/me/adaccounts?fields=${fields}&limit=100`;
+  let pages = 0;
+  while (url && pages < 5) {
+    const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new MetaGraphError(
+        'adaccounts',
+        res.status,
+        `Meta Graph API ${res.status} on adaccounts: ${detail.slice(0, 500)}`,
+      );
+    }
+    const json = (await res.json()) as { data?: unknown[]; paging?: { next?: string } };
+    for (const raw of json.data ?? []) {
+      results.push(metaAdAccountApiSchema.parse(raw));
+    }
+    url = json.paging?.next;
+    pages++;
+  }
+  return results;
+}
+
 export async function listCampaignInsights(
   adAccountId: string,
   token: string,

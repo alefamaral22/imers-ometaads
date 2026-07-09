@@ -211,6 +211,49 @@ export function whatsappSummary(
 
 // ── Métricas "estado atual" por conta de anúncio (campaign_insights, sem depender de analysis) ──
 
+/** Resumo das campanhas de WhatsApp a partir de campaign_insights. */
+export function whatsappSummaryFromInsights(
+  insights: readonly CampaignInsightInput[],
+  names: ReadonlyMap<string, string>,
+  totalSpendCents: number,
+): WhatsAppSummary {
+  const wa = insights.filter((i) => i.conversations !== null);
+  let spendCents = 0;
+  let conversations = 0;
+  let replies = 0;
+  const rows = wa
+    .map((i): WhatsAppCampaign => {
+      const conv = i.conversations ?? 0;
+      const rep = i.replies ?? 0;
+      spendCents += i.spendCents;
+      conversations += conv;
+      replies += rep;
+      const id = i.metaCampaignId ?? i.campaignId;
+      return {
+        metaEntityId: id,
+        name: names.get(id) || id,
+        spendCents: i.spendCents,
+        conversations: conv,
+        replies: rep,
+        costPerConversationCents: conv > 0 ? Math.round(i.spendCents / conv) : 0,
+        msgsPerConversation: conv > 0 ? rep / conv : 0,
+        ctr: i.impressions > 0 ? i.clicks / i.impressions : 0,
+      };
+    })
+    .sort((a, b) => b.spendCents - a.spendCents);
+
+  return {
+    campaigns: wa.length,
+    conversations,
+    replies,
+    spendCents,
+    costPerConversationCents: conversations > 0 ? Math.round(spendCents / conversations) : 0,
+    msgsPerConversation: conversations > 0 ? replies / conversations : 0,
+    pctOfTotalSpend: totalSpendCents > 0 ? spendCents / totalSpendCents : 0,
+    rows,
+  };
+}
+
 export interface CampaignInsightInput {
   campaignId: string;
   metaCampaignId: string | null;
@@ -219,6 +262,8 @@ export interface CampaignInsightInput {
   clicks: number;
   results: number;
   cpcCents: number | null;
+  conversations: number | null;
+  replies: number | null;
 }
 
 /** Mesma forma de Kpis, mas agregada direto de campaign_insights (cliques vêm da própria Meta, não derivados). */
