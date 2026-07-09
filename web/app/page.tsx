@@ -19,6 +19,7 @@ import {
   Td,
   Th,
 } from '../components/ui';
+import { OverviewKpisWithSelector } from '../components/overview-kpis-with-selector';
 import { formatCents, formatDate, formatInteger, formatRatioPercent } from '../lib/domain/format';
 
 // Reads use the request-time service_role client; never statically prerender.
@@ -197,30 +198,8 @@ export default async function OverviewPage() {
         )}
       </Card>
 
-      {/* KPIs de performance (SPEC-017) — agregados da última análise por cliente, escopados por account. */}
-      <div
-        className="rise-in grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8"
-        style={{ animationDelay: '120ms' }}
-      >
-        <Stat
-          label="Gasto total"
-          tone="accent"
-          value={formatCents(kpis.spendCents)}
-          hint={`${kpis.campaigns} campanha${kpis.campaigns === 1 ? '' : 's'}`}
-        />
-        <Stat label="Impressões" tone="accent2" value={formatInteger(kpis.impressions)} />
-        <Stat label="Cliques" tone="accent2" value={formatInteger(kpis.clicks)} />
-        <Stat label="CTR médio" tone="pos" value={formatRatioPercent(kpis.ctr)} />
-        <Stat label="CPC médio" tone="warn" value={formatCents(kpis.cpcCents)} hint="por clique" />
-        <Stat
-          label="CPM médio"
-          tone="purple"
-          value={formatCents(kpis.cpmCents)}
-          hint="por mil impr."
-        />
-        <Stat label="Resultados" tone="pos" value={formatInteger(kpis.results)} />
-        <Stat label="Campanhas" tone="accent" value={kpis.campaigns} hint="na última análise" />
-      </div>
+      {/* KPIs de performance (SPEC-017) — com seletor de conta de anúncio (ADR 0037). */}
+      <OverviewKpisWithSelector initialKpis={kpis} />
 
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
         <Stat label="Clientes" value={clients.length} tone="accent2" />
