@@ -644,12 +644,20 @@ app.get('/data/ad-accounts', async (c) => {
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
   const scope = scopeFromClaims(claims);
   const connections = await listConnections(scope);
-  const adAccounts = connections.map((conn) => ({
-    metaAdAccountId: conn.meta_ad_account_id,
-    label: conn.token_label ?? conn.meta_ad_account_id,
-    clientId: conn.client_id,
-    status: conn.status,
-  }));
+  // Deduplica por meta_ad_account_id (pode haver múltiplas conexões para a mesma conta)
+  const seen = new Set<string>();
+  const adAccounts = connections
+    .filter((conn) => {
+      if (seen.has(conn.meta_ad_account_id)) return false;
+      seen.add(conn.meta_ad_account_id);
+      return true;
+    })
+    .map((conn) => ({
+      metaAdAccountId: conn.meta_ad_account_id,
+      label: conn.token_label ?? conn.meta_ad_account_id,
+      clientId: conn.client_id,
+      status: conn.status,
+    }));
   return c.json({ adAccounts });
 });
 
