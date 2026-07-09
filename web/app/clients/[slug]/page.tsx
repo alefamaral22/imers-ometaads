@@ -7,6 +7,7 @@ import { listAnalysesByClient } from '../../../lib/services/analyses';
 import { listLandingPagesByClient } from '../../../lib/services/landing-pages';
 import { listOperationLogsByClient } from '../../../lib/services/logs';
 import { listProducts } from '../../../lib/services/products';
+import { listConnections } from '../../../lib/services/connections';
 import { Shell } from '../../../components/shell';
 import {
   Badge,
@@ -21,6 +22,7 @@ import {
 } from '../../../components/ui';
 import { formatCents, formatDate } from '../../../lib/domain/format';
 import { ProductForm } from '../../../components/clients/product-form';
+import { ClientAdAccounts } from '../../../components/clients/client-ad-accounts';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,13 +41,15 @@ export default async function ClientPage({ params }: { params: Promise<{ slug: s
   let pages: Awaited<ReturnType<typeof listLandingPagesByClient>> = [];
   let logs: Awaited<ReturnType<typeof listOperationLogsByClient>> = [];
   let products: Awaited<ReturnType<typeof listProducts>> = [];
+  let connections: Awaited<ReturnType<typeof listConnections>> = [];
   try {
-    [campaigns, analyses, pages, logs, products] = await Promise.all([
+    [campaigns, analyses, pages, logs, products, connections] = await Promise.all([
       listCampaignsByClient(client.id),
       listAnalysesByClient(client.id, 10),
       listLandingPagesByClient(client.id),
       listOperationLogsByClient(client.id, 10),
       listProducts(client.id),
+      listConnections(scope),
     ]);
   } catch (e) {
     error = e instanceof Error ? e.message : 'erro ao ler o banco';
@@ -70,6 +74,11 @@ export default async function ClientPage({ params }: { params: Promise<{ slug: s
           <EmptyState>Dados indisponíveis: {error}</EmptyState>
         </div>
       ) : null}
+
+      <div className="mt-8">
+        <CardTitle>Conta de anúncio Meta</CardTitle>
+        <ClientAdAccounts clientId={client.id} connections={connections} />
+      </div>
 
       <div className="mt-8">
         <CardTitle>Campanhas</CardTitle>
