@@ -79,7 +79,12 @@ import {
 } from '../../../lib/services/connections';
 import { syncCampaigns } from '../../../lib/services/campaign-sync';
 import { listAdAccountsFromToken, MetaGraphError } from '../../../lib/meta/graph-client';
-import { getOverviewMetricsForAdAccount } from '../../../lib/services/overview-metrics';
+import {
+  getOverviewMetrics,
+  getOverviewMetricsForAdAccount,
+  getOverviewMetricsForAdAccountWithDateRange,
+  type DateRange,
+} from '../../../lib/services/overview-metrics';
 import { listApiKeys, upsertApiKey } from '../../../lib/services/api-keys';
 import { listPlans, createPlan, updatePlan } from '../../../lib/services/plans';
 import {
@@ -663,12 +668,23 @@ app.get('/data/ad-accounts', async (c) => {
 
 // Métricas "estado atual" (campaign_insights) de UMA conta de anúncio — alimenta o seletor da Visão
 // geral: ao trocar a conta, o client component chama esta rota e reconstrói os cards na hora.
+// Suporta filtro por data (since/until) → busca live da Meta Graph API.
 app.get('/data/overview-metrics', async (c) => {
   const claims = await apiClaims(c);
   if (!claims) return c.json({ error: 'unauthorized' }, 401);
   const metaAdAccountId = c.req.query('metaAdAccountId');
-  if (!metaAdAccountId) return c.json({ error: 'invalid_request' }, 400);
   const scope = scopeFromClaims(claims);
+
+  const since = c.req.query('since');
+  const until = c.req.query('until');
+  if (since && until) {
+    const dateRange = { since, until } satisfies DateRange;
+    const metrics = metaAdAccountId
+      ? await getOverviewMetricsForAdAccountWithDateRange(scope, metaAdAccountId, dateRange)
+      : await getOverviewMetrics(scope, dateRange);
+    return c.json({ metrics });
+  }
+  if (!metaAdAccountId) return c.json({ error: 'invalid_request' }, 400);
   const metrics = await getOverviewMetricsForAdAccount(scope, metaAdAccountId);
   return c.json({ metrics });
 });

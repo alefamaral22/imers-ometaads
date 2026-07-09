@@ -7,7 +7,10 @@ import {
   parseRows,
   type MetricSnapshotRow,
 } from '../domain/schemas';
-import type { AccountScope } from '../multitenant/scope';
+import { canManageAccount, type AccountScope } from '../multitenant/scope';
+import { decryptSecret, fromPgByteaHex } from '../multitenant/secrets';
+import { adTokenEncKey } from '../multitenant/enc-keys';
+import { listCampaignInsights } from '../meta/graph-client';
 import {
   aggregateKpis,
   aggregateInsightKpis,
@@ -157,9 +160,18 @@ export async function getOverviewMetricsForAdAccount(
   };
 }
 
-export async function getOverviewMetrics(scope: AccountScope): Promise<OverviewMetrics> {
+export async function getOverviewMetrics(
+  scope: AccountScope,
+  dateRange?: DateRange,
+): Promise<OverviewMetrics> {
   // Janela de análises generosa o bastante para a série temporal; as últimas por cliente viram os KPIs.
-  const analysisRows = await listAnalyses(scope, 60);
+  const allAnalysisRows = await listAnalyses(scope, 60);
+  const analysisRows = dateRange
+    ? allAnalysisRows.filter((a) => {
+        const at = (a.window_stop ?? a.created_at).slice(0, 10);
+        return at >= dateRange.since && at <= dateRange.until;
+      })
+    : allAnalysisRows;
   if (analysisRows.length === 0) {
     return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
   }
@@ -193,5 +205,89 @@ export async function getOverviewMetrics(scope: AccountScope): Promise<OverviewM
     series: spendSeries(analyses, metrics),
     whatsapp: whatsappSummary(currentSnapshots, names, kpis.spendCents),
     hasData: true,
+  };
+}
+
+// ── Filtro por data (live Meta Graph API) ────────────────────────────────────
+
+export interface DateRange {
+  since: string; // YYYY-MM-DD
+  until: string; // YYYY-MM-DD
+}
+
+/**
+ * Métricas "ao vivo" de UMA conta de anúncio, filtradas por janela temporal (date range).
+ * Busca insights da Meta Graph API em tempo real com time_range (não usa campaign_insights).
+ * Precisa da conexão com token cifrado — decifra em memória só pra esta chamada.
+ */
+export async function getOverviewMetricsForAdAccountWithDateRange(
+  scope: AccountScope,
+  metaAdAccountId: string,
+  dateRange: DateRange,
+): Promise<OverviewMetrics> {
+  // 1) Acha a conexão com cipher do token
+  const connRows = await selectRows('ad_account_connections', {
+    select: 'id,account_id,meta_ad_account_id,access_token_cipher,client_id',
+    eq: { meta_ad_account_id: metaAdAccountId },
+    limit: 1,
+  });
+  const conn = (connRows as Array<{
+    id: string;
+    account_id: string;
+    meta_ad_account_id: string;
+    access_token_cipher: string | null;
+    client_id: string | null;
+  }>)[0];
+  if (!conn) return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
+  if (!canManageAccount(scope, conn.account_id)) {
+    return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
+  }
+  if (!conn.access_token_cipher) {
+    return { kpis: EMPTY_KPIS, top: [], series: [], whatsapp: EMPTY_WHATSAPP, hasData: false };
+  }
+
+  // 2) Decifra token
+  const token = decryptSecret(fromPgByteaHex(conn.access_token_cipher), adTokenEncKey());
+
+  // 3) Lista campanhas locais pra nomes
+  const campaignRows = await selectRows('campaigns', {
+    eq: { meta_ad_account_id: metaAdAccountId },
+    limit: 500,
+  });
+  const campaigns = parseRows(campaignRowSchema, campaignRows);
+  const allowedClientIds = await accountClientIds(scope);
+  const scoped = allowedClientIds === null
+    ? campaigns
+    : campaigns.filter((c) => allowedClientIds.includes(c.client_id));
+
+  const names = new Map<string, string>();
+  for (const c of scoped) {
+    if (c.meta_campaign_id) names.set(c.meta_campaign_id, c.name);
+  }
+
+  // 4) Busca insights da Meta com time_range
+  const insights = await listCampaignInsights(metaAdAccountId, token, fetch, dateRange);
+
+  // 5) Mapeia para CampaignInsightInput
+  const inputs: CampaignInsightInput[] = insights.map((i) => ({
+    campaignId: i.campaignId,
+    metaCampaignId: i.campaignId,
+    spendCents: i.spendCents,
+    impressions: i.impressions,
+    clicks: i.clicks,
+    results: i.results,
+    cpcCents: i.cpcCents,
+    conversations: i.conversations > 0 ? i.conversations : null,
+    replies: i.replies > 0 ? i.replies : null,
+  }));
+
+  const kpis = aggregateInsightKpis(inputs);
+  const whatsapp = whatsappSummaryFromInsights(inputs, names, kpis.spendCents);
+  return {
+    kpis: { ...kpis, campaigns: scoped.length },
+    top: topCampaignsByInsightSpend(inputs, names, 5),
+    series: [],
+    whatsapp,
+    hasData: inputs.length > 0,
   };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardTitle, EmptyState, Pill, Stat, Table, Td, Th } from './ui';
 import { formatCents, formatInteger, formatRatioPercent } from '../lib/domain/format';
 
@@ -52,9 +52,49 @@ interface OverviewMetricsResponse {
   };
 }
 
+type PeriodPreset = 'today' | '7d' | '15d' | '30d' | 'custom';
+
+interface DateRange {
+  since: string;
+  until: string;
+}
+
+function formatDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function rangeForPreset(preset: PeriodPreset): DateRange {
+  const until = new Date();
+  const since = new Date();
+  switch (preset) {
+    case 'today':
+      break;
+    case '7d':
+      since.setDate(since.getDate() - 7);
+      break;
+    case '15d':
+      since.setDate(since.getDate() - 15);
+      break;
+    case '30d':
+      since.setDate(since.getDate() - 30);
+      break;
+    default:
+      break;
+  }
+  return { since: formatDate(since), until: formatDate(until) };
+}
+
+const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
+  { value: 'today', label: 'Hoje' },
+  { value: '7d', label: '7 dias' },
+  { value: '15d', label: '15 dias' },
+  { value: '30d', label: '30 dias' },
+  { value: 'custom', label: 'Personalizado' },
+];
+
 /**
- * KPIs + WhatsApp da Visão Geral com seletor de conta de anúncio. Ao trocar a conta, busca as
- * métricas "estado atual" (campaign_insights) dessa conta e atualiza os cards na hora.
+ * KPIs + WhatsApp da Visão Geral com seletor de conta de anúncio e filtro de data.
+ * Ao trocar a conta ou período, busca métricas da API e atualiza os cards na hora.
  */
 export function OverviewKpisWithSelector({
   initialKpis,
@@ -65,11 +105,13 @@ export function OverviewKpisWithSelector({
 }) {
   const [accounts, setAccounts] = useState<AdAccountOption[]>([]);
   const [selected, setSelected] = useState('');
+  const [period, setPeriod] = useState<PeriodPreset>('30d');
+  const [customSince, setCustomSince] = useState('');
+  const [customUntil, setCustomUntil] = useState('');
   const [loading, setLoading] = useState(false);
   const [kpis, setKpis] = useState(initialKpis);
   const [whatsapp, setWhatsapp] = useState(initialWhatsapp);
 
-  // Carrega lista de contas de anúncio conectadas
   useEffect(() => {
     let alive = true;
     fetch('/api/data/ad-accounts')
@@ -85,56 +127,143 @@ export function OverviewKpisWithSelector({
     };
   }, []);
 
+  const buildDateRange = useCallback((preset: PeriodPreset): DateRange | null => {
+    if (preset === 'custom') {
+      if (!customSince || !customUntil) return null;
+      return { since: customSince, until: customUntil };
+    }
+    return rangeForPreset(preset);
+  }, [customSince, customUntil]);
+
+  const fetchMetrics = useCallback(
+    async (metaAdAccountId: string, preset: PeriodPreset) => {
+      const range = buildDateRange(preset);
+      if (preset === 'custom' && !range) return;
+
+      if (!metaAdAccountId && !range) {
+        setKpis(initialKpis);
+        setWhatsapp(initialWhatsapp);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (metaAdAccountId) params.set('metaAdAccountId', metaAdAccountId);
+        if (range) {
+          params.set('since', range.since);
+          params.set('until', range.until);
+        }
+        const res = await fetch(`/api/data/overview-metrics?${params}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as OverviewMetricsResponse;
+        setKpis(data.metrics.kpis);
+        setWhatsapp(data.metrics.whatsapp);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [buildDateRange, initialKpis, initialWhatsapp],
+  );
+
   async function handleSelect(metaAdAccountId: string) {
     setSelected(metaAdAccountId);
-    if (!metaAdAccountId) {
-      // "Todas as contas" → volta pro agregado padrão
-      setKpis(initialKpis);
-      setWhatsapp(initialWhatsapp);
-      return;
+    await fetchMetrics(metaAdAccountId, period);
+  }
+
+  async function handlePeriodChange(newPreset: PeriodPreset) {
+    setPeriod(newPreset);
+    if (newPreset !== 'custom') {
+      await fetchMetrics(selected, newPreset);
     }
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/data/overview-metrics?metaAdAccountId=${encodeURIComponent(metaAdAccountId)}`,
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as OverviewMetricsResponse;
-      setKpis(data.metrics.kpis);
-      setWhatsapp(data.metrics.whatsapp);
-    } finally {
-      setLoading(false);
-    }
+  }
+
+  async function handleCustomApply() {
+    if (!customSince || !customUntil) return;
+    await fetchMetrics(selected, 'custom');
   }
 
   return (
     <>
-      {/* Seletor de conta — só aparece se há contas conectadas */}
-      {accounts.length > 0 && (
-        <div className="rise-in mb-4 flex items-center gap-3" style={{ animationDelay: '50ms' }}>
-          <label
-            htmlFor="overview-ad-account-selector"
-            className="text-[10px] tracking-wider text-dim uppercase"
-          >
-            Conta de anúncio
-          </label>
-          <select
-            id="overview-ad-account-selector"
-            value={selected}
-            onChange={(e) => void handleSelect(e.target.value)}
-            disabled={loading}
-            className="max-w-[16rem] rounded-md border border-edge/70 bg-panel/60 px-2 py-1.5 text-[11px] text-ink outline-none focus:border-accent disabled:opacity-50"
-          >
-            <option value="">Todas as contas (agregado por análise)</option>
-            {accounts.map((a) => (
-              <option key={a.metaAdAccountId} value={a.metaAdAccountId}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-          {loading && <span className="text-[10px] text-dim animate-pulse">carregando...</span>}
+      {/* Seletor de conta + filtro de data */}
+      <div
+        className="rise-in mb-4 flex flex-wrap items-center gap-3"
+        style={{ animationDelay: '50ms' }}
+      >
+        {accounts.length > 0 && (
+          <>
+            <label
+              htmlFor="overview-ad-account-selector"
+              className="text-[10px] tracking-wider text-dim uppercase"
+            >
+              Conta de anúncio
+            </label>
+            <select
+              id="overview-ad-account-selector"
+              value={selected}
+              onChange={(e) => void handleSelect(e.target.value)}
+              disabled={loading}
+              className="max-w-[16rem] rounded-md border border-edge/70 bg-panel/60 px-2 py-1.5 text-[11px] text-ink outline-none focus:border-accent disabled:opacity-50"
+            >
+              <option value="">Todas as contas (agregado por análise)</option>
+              {accounts.map((a) => (
+                <option key={a.metaAdAccountId} value={a.metaAdAccountId}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        <span className="ml-2 text-[10px] tracking-wider text-dim uppercase">Período</span>
+        <div className="flex items-center gap-1">
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => void handlePeriodChange(opt.value)}
+              disabled={loading}
+              className={`rounded-md border px-2.5 py-1.5 text-[11px] font-medium tracking-wide transition-colors disabled:opacity-50 ${
+                period === opt.value
+                  ? 'border-accent bg-accent/15 text-accent'
+                  : 'border-edge/70 bg-panel/40 text-ink/70 hover:border-accent/50 hover:text-ink'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
-      )}
+
+        {period === 'custom' && (
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={customSince}
+              onChange={(e) => setCustomSince(e.target.value)}
+              disabled={loading}
+              className="rounded-md border border-edge/70 bg-panel/60 px-2 py-1.5 text-[11px] text-ink outline-none focus:border-accent disabled:opacity-50"
+            />
+            <span className="text-[10px] text-dim">→</span>
+            <input
+              type="date"
+              value={customUntil}
+              onChange={(e) => setCustomUntil(e.target.value)}
+              disabled={loading}
+              className="rounded-md border border-edge/70 bg-panel/60 px-2 py-1.5 text-[11px] text-ink outline-none focus:border-accent disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => void handleCustomApply()}
+              disabled={loading || !customSince || !customUntil}
+              className="rounded-md border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-50"
+            >
+              Aplicar
+            </button>
+          </div>
+        )}
+
+        {loading && <span className="text-[10px] text-dim animate-pulse">carregando...</span>}
+      </div>
 
       {/* WhatsApp — resumo das campanhas de mensagem (SPEC-017). */}
       <Card className="rise-in mb-6" style={{ animationDelay: '60ms' }}>

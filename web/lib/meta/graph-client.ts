@@ -196,12 +196,17 @@ export async function listCampaignInsights(
   adAccountId: string,
   token: string,
   fetchImpl: FetchLike = fetch,
+  dateRange?: { since: string; until: string },
 ): Promise<CampaignInsight[]> {
   const fields = 'campaign_id,spend,impressions,clicks,ctr,cpc,cpm,actions';
   const results: CampaignInsight[] = [];
+  // Se houver dateRange, usa time_range (formato JSON codificado); senão date_preset=maximum (vida toda).
+  const timeParam = dateRange
+    ? `time_range=${encodeURIComponent(JSON.stringify(dateRange))}`
+    : `date_preset=maximum`;
   let url: string | undefined =
     `${baseUrl()}/${adAccountId}/insights` +
-    `?level=campaign&date_preset=maximum&fields=${fields}&limit=100`;
+    `?level=campaign&${timeParam}&fields=${fields}&limit=100`;
   let pages = 0;
   while (url && pages < 5) {
     const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
