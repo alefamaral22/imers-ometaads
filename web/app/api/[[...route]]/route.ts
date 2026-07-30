@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { handle } from 'hono/vercel';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 import { serverEnv, isTurnstileEnabled, publicEnv } from '../../../lib/env';
@@ -56,7 +56,7 @@ import {
   type LandingInputsContext,
 } from '../../../lib/landing/inputs';
 import { startWatch } from '../../../lib/services/watches';
-import { isSecretsVaultEnabled } from '../../../lib/env';
+import { isSecretsVaultEnabled, isMetaOAuthEnabled } from '../../../lib/env';
 import {
   listAccounts,
   getLoginAccountByEmail,
@@ -74,9 +74,25 @@ import { IMPERSONATION_COOKIE_NAME, IMPERSONATION_TTL_SECONDS } from '../../../l
 import {
   listConnections,
   createConnection,
+  createOAuthConnection,
   updateConnection,
   deleteConnection,
 } from '../../../lib/services/connections';
+import {
+  META_OAUTH_PENDING_COOKIE,
+  META_OAUTH_STATE_TTL_SECONDS,
+  buildAuthorizeUrl,
+  classifyCallback,
+  exchangeCodeForLongLivedToken,
+  fetchMetaUserId,
+  openPendingOAuth,
+  resolveRedirectUri,
+  resolveRequestOrigin,
+  sealPendingOAuth,
+  signOAuthState,
+  verifyOAuthState,
+} from '../../../lib/meta/oauth';
+import { adTokenEncKey } from '../../../lib/multitenant/enc-keys';
 import { syncCampaigns } from '../../../lib/services/campaign-sync';
 import { listAdAccountsFromToken, MetaGraphError } from '../../../lib/meta/graph-client';
 import {
@@ -99,6 +115,7 @@ import {
 import {
   createConnectionSchema,
   updateConnectionSchema,
+  finishOAuthConnectionSchema,
   upsertApiKeySchema,
   createAccountSchema,
   setAccountActiveSchema,
@@ -569,6 +586,208 @@ app.post('/data/meta/load-ad-accounts', async (c) => {
     }
     throw err;
   }
+});
+
+// ── ADR 0038 — OAuth oficial da Meta ("Conectar com Facebook") ─────────────────
+// Fluxo: /oauth/meta/start (redirect) → Meta → /oauth/meta/callback (troca code por long-lived token,
+// guarda em cookie httpOnly CIFRADO) → UI lista contas (/data/meta/oauth-pending) → o operador escolhe
+// → /data/connections/oauth-finish grava as conexões e apaga o cookie. O token nunca volta em JSON.
+// Estas rotas exigem sessão (o middleware do Next já barra anônimo; checamos de novo aqui).
+const SETTINGS_REDIRECT = '/settings?meta_oauth=';
+
+/**
+ * Origem pública desta requisição. Em dev atrás de túnel (cloudflared) ou na Vercel, `c.req.url`
+ * traz o host interno (localhost:3000) e a Meta recusa o redirect_uri com "não é possível carregar
+ * a URL". `META_OAUTH_REDIRECT_URI` continua tendo a palavra final em `resolveRedirectUri`.
+ */
+function oauthOrigin(c: Context): string {
+  return resolveRequestOrigin(c.req.url, {
+    host: c.req.header('x-forwarded-host'),
+    proto: c.req.header('x-forwarded-proto'),
+  });
+}
+
+function pendingCookieOptions(maxAge: number) {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax' as const,
+    path: '/',
+    maxAge,
+  };
+}
+
+app.get('/oauth/meta/start', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const env = serverEnv();
+  if (!isMetaOAuthEnabled(env)) return c.json({ error: 'oauth_unconfigured' }, 503);
+  if (!isSecretsVaultEnabled(env)) return c.json({ error: 'vault_unconfigured' }, 503);
+
+  // accountId de texto livre só é aceito de quem tem visibilidade global; senão é a própria account.
+  const requested = c.req.query('accountId');
+  let accountId = claims.sub;
+  if (requested !== undefined) {
+    if (!UUID_RE.test(requested)) return c.json({ error: 'invalid_request' }, 400);
+    if (!hasRole(claims, ['super_admin', 'socio']) && requested !== claims.sub) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    accountId = requested;
+  }
+
+  const state = await signOAuthState({ accountId, nonce: crypto.randomUUID() }, env.AUTH_SECRET);
+  const redirectUri = resolveRedirectUri(oauthOrigin(c), env.META_OAUTH_REDIRECT_URI);
+  return c.redirect(
+    buildAuthorizeUrl({
+      appId: env.META_APP_ID as string,
+      redirectUri,
+      state,
+      // Presente = app usa "Login para Empresas" (config_id em vez de scope).
+      configId: env.META_LOGIN_CONFIG_ID,
+    }),
+    302,
+  );
+});
+
+app.get('/oauth/meta/callback', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  const env = serverEnv();
+  if (!isMetaOAuthEnabled(env)) return c.json({ error: 'oauth_unconfigured' }, 503);
+  if (!isSecretsVaultEnabled(env)) return c.json({ error: 'vault_unconfigured' }, 503);
+
+  const outcome = classifyCallback({
+    code: c.req.query('code'),
+    state: c.req.query('state'),
+    error: c.req.query('error'),
+  });
+  if (outcome.kind === 'denied') return c.redirect(`${SETTINGS_REDIRECT}cancelled`, 302);
+  if (outcome.kind === 'invalid') return c.redirect(`${SETTINGS_REDIRECT}invalid_state`, 302);
+
+  // CSRF: state assinado (TTL 10 min). Sem state válido nada é trocado nem gravado.
+  const state = await verifyOAuthState(outcome.state, env.AUTH_SECRET);
+  if (!state) return c.redirect(`${SETTINGS_REDIRECT}invalid_state`, 302);
+  if (!hasRole(claims, ['super_admin', 'socio']) && state.accountId !== claims.sub) {
+    return c.redirect(`${SETTINGS_REDIRECT}forbidden`, 302);
+  }
+
+  const redirectUri = resolveRedirectUri(oauthOrigin(c), env.META_OAUTH_REDIRECT_URI);
+  try {
+    const token = await exchangeCodeForLongLivedToken({
+      appId: env.META_APP_ID as string,
+      appSecret: env.META_APP_SECRET as string,
+      redirectUri,
+      code: outcome.code,
+    });
+    const userId = await fetchMetaUserId(token);
+    // Staging efêmero: cookie httpOnly com conteúdo CIFRADO (nunca texto puro no browser/log).
+    setCookie(
+      c,
+      META_OAUTH_PENDING_COOKIE,
+      sealPendingOAuth({ token, userId, accountId: state.accountId }, adTokenEncKey()),
+      pendingCookieOptions(META_OAUTH_STATE_TTL_SECONDS),
+    );
+    return c.redirect(`${SETTINGS_REDIRECT}ok`, 302);
+  } catch (err) {
+    // Detalhe do erro só no log do servidor (pode conter dados do app), nunca na URL.
+    console.error(
+      '[GET /oauth/meta/callback]',
+      err instanceof Error ? err.message : 'erro desconhecido',
+    );
+    return c.redirect(`${SETTINGS_REDIRECT}exchange_failed`, 302);
+  }
+});
+
+// Contas de anúncio acessíveis pela autorização pendente. NUNCA devolve o token.
+app.get('/data/meta/oauth-pending', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!isSecretsVaultEnabled(serverEnv())) return c.json({ error: 'vault_unconfigured' }, 503);
+  const pending = openPendingOAuth(getCookie(c, META_OAUTH_PENDING_COOKIE), adTokenEncKey());
+  if (!pending) return c.json({ pending: false });
+  if (!hasRole(claims, ['super_admin', 'socio']) && pending.accountId !== claims.sub) {
+    return c.json({ error: 'forbidden' }, 403);
+  }
+  try {
+    const adAccounts = await listAdAccountsFromToken(pending.token);
+    return c.json({
+      pending: true,
+      accountId: pending.accountId,
+      adAccounts: adAccounts.map((a) => ({
+        id: a.id,
+        name: a.name,
+        accountStatus: a.account_status,
+        currency: a.currency,
+        businessName: a.business_name,
+      })),
+    });
+  } catch (err) {
+    if (err instanceof MetaGraphError) {
+      console.error('[GET /data/meta/oauth-pending]', err.message);
+      if (err.httpStatus === 401 || err.httpStatus === 403) {
+        deleteCookie(c, META_OAUTH_PENDING_COOKIE, { path: '/' });
+        return c.json(
+          { error: 'auth_error', message: 'Autorização expirada. Conecte novamente.' },
+          401,
+        );
+      }
+      return c.json({ error: 'meta_error', message: 'Erro ao ler as contas na Meta.' }, 502);
+    }
+    throw err;
+  }
+});
+
+app.post('/data/meta/oauth-pending/discard', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  deleteCookie(c, META_OAUTH_PENDING_COOKIE, { path: '/' });
+  return c.json({ ok: true });
+});
+
+// Conclui o OAuth: grava uma conexão por conta escolhida e apaga o staging. Conta já conectada falha
+// só ela (índice anti-hijack de meta_ad_account_id), as outras seguem.
+app.post('/data/connections/oauth-finish', async (c) => {
+  const claims = await apiClaims(c);
+  if (!claims) return c.json({ error: 'unauthorized' }, 401);
+  if (!isSecretsVaultEnabled(serverEnv())) return c.json({ error: 'vault_unconfigured' }, 503);
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = finishOAuthConnectionSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+  const pending = openPendingOAuth(getCookie(c, META_OAUTH_PENDING_COOKIE), adTokenEncKey());
+  if (!pending) return c.json({ error: 'no_pending_authorization' }, 409);
+  // A account vem do cookie (assinado pelo nosso fluxo); o body só confirma — divergência aborta.
+  if (parsed.data.accountId !== pending.accountId) return c.json({ error: 'forbidden' }, 403);
+
+  const scope = scopeFromClaims(claims);
+  const created: string[] = [];
+  const failed: string[] = [];
+  for (const metaAdAccountId of parsed.data.adAccountIds) {
+    try {
+      await createOAuthConnection(scope, {
+        accountId: pending.accountId,
+        metaAdAccountId,
+        token: pending.token,
+        metaUserId: pending.userId,
+        ...(parsed.data.tokenLabel ? { tokenLabel: parsed.data.tokenLabel } : {}),
+      });
+      created.push(metaAdAccountId);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('forbidden')) {
+        return c.json({ error: 'forbidden' }, 403);
+      }
+      console.error(
+        '[POST /data/connections/oauth-finish]',
+        metaAdAccountId,
+        err instanceof Error ? err.message : 'erro desconhecido',
+      );
+      failed.push(metaAdAccountId);
+    }
+  }
+  // O staging morre aqui de qualquer forma: o token já está cifrado no cofre para o que deu certo.
+  deleteCookie(c, META_OAUTH_PENDING_COOKIE, { path: '/' });
+  if (created.length === 0) return c.json({ ok: false, created, failed }, 409);
+  return c.json({ ok: true, created, failed }, 201);
 });
 
 app.patch('/data/connections/:id', async (c) => {

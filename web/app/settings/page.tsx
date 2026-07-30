@@ -1,5 +1,6 @@
+import { Suspense } from 'react';
 import { requireOperator } from '../../lib/auth/server';
-import { serverEnv, isSecretsVaultEnabled } from '../../lib/env';
+import { serverEnv, isSecretsVaultEnabled, isMetaOAuthEnabled } from '../../lib/env';
 import { getCurrentScope, listAccounts } from '../../lib/services/accounts';
 import { listConnections } from '../../lib/services/connections';
 import { listClients } from '../../lib/services/clients';
@@ -9,6 +10,7 @@ import { Shell } from '../../components/shell';
 import { Badge, EmptyState, PageHeader, Table, Td, Th } from '../../components/ui';
 import { formatDate } from '../../lib/domain/format';
 import { ConnectionForm } from '../../components/settings/connection-form';
+import { MetaOAuthConnect } from '../../components/settings/meta-oauth-connect';
 import { EditConnectionButton } from '../../components/settings/edit-connection-button';
 import { DeleteConnectionButton } from '../../components/settings/delete-connection-button';
 import { SyncCampaignsButton } from '../../components/settings/sync-campaigns-button';
@@ -24,7 +26,10 @@ function mask(last4: string | null): string {
 export default async function SettingsPage() {
   const claims = await requireOperator();
 
-  const vaultOn = isSecretsVaultEnabled(serverEnv());
+  const env = serverEnv();
+  const vaultOn = isSecretsVaultEnabled(env);
+  // ADR 0038 — "Conectar com Facebook" só aparece com META_APP_ID/SECRET; concluir exige o cofre.
+  const oauthOn = isMetaOAuthEnabled(env) && vaultOn;
 
   let error: string | null = null;
   let connections: Awaited<ReturnType<typeof listConnections>> = [];
@@ -71,6 +76,16 @@ export default async function SettingsPage() {
       {error ? <EmptyState>Dados indisponíveis: {error}</EmptyState> : null}
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-ink/80">Conexões Meta</h2>
+      {/* useSearchParams (leitura do ?meta_oauth=) exige Suspense em página server-rendered. */}
+      {accountList.length > 0 ? (
+        <Suspense fallback={null}>
+          <MetaOAuthConnect
+            enabled={oauthOn}
+            accounts={accountList}
+            {...(fixedAccountId ? { fixedAccountId } : {})}
+          />
+        </Suspense>
+      ) : null}
       {accountList.length > 0 ? (
         <ConnectionForm
           accounts={accountList}

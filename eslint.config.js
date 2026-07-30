@@ -50,5 +50,19 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    // Scripts de verificação manual em ESM Node (rodados à mão, fora do bundle). Globals do Node.
+    files: ['**/scripts/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        TextEncoder: 'readonly',
+      },
+    },
+  },
   prettier,
 );

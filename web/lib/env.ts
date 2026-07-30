@@ -28,6 +28,14 @@ export const serverEnvSchema = z.object({
   // para o build/login não exigirem; o serviço que cifra falha com erro claro se faltarem.
   AD_TOKEN_ENC_KEY: z.string().trim().optional(), // cifra tokens Meta em ad_account_connections
   API_KEY_ENC_KEY: z.string().trim().optional(), // cifra keys de provedor em api_keys_clientes
+  // ADR 0038 — OAuth oficial da Meta ("Conectar com Facebook") como 2º método de conexão. Opcionais:
+  // sem as duas, o fluxo fica desligado e o token manual (ADR 0028) segue como único caminho.
+  META_APP_ID: z.string().trim().optional(),
+  META_APP_SECRET: z.string().trim().optional(), // segredo — só server-side, nunca no browser
+  META_OAUTH_REDIRECT_URI: z.string().trim().url().optional(), // default: origin + /api/oauth/meta/callback
+  // "Login do Facebook para Empresas": as permissões vivem numa configuração do painel, referenciada
+  // por config_id (o produto não aceita `scope`). Ausente = diálogo clássico com escopos.
+  META_LOGIN_CONFIG_ID: z.string().trim().optional(),
   // Optional: Turnstile (bot protection on login) is enabled only when both are present.
   CLOUDFLARE_TURNSTILE_SECRET_KEY: z.string().trim().optional(),
   // Optional: Upstash rate limiting on the login endpoint.
@@ -101,6 +109,16 @@ export function isSecretsVaultEnabled(
   server: Pick<ServerEnv, 'AD_TOKEN_ENC_KEY' | 'API_KEY_ENC_KEY'>,
 ): boolean {
   return Boolean(server.AD_TOKEN_ENC_KEY && server.API_KEY_ENC_KEY);
+}
+
+/**
+ * ADR 0038 — o OAuth da Meta só liga com App ID + App Secret. `AD_TOKEN_ENC_KEY` também é necessária
+ * para concluir (cifra o token), mas isso é o cofre: checado por `isSecretsVaultEnabled`.
+ */
+export function isMetaOAuthEnabled(
+  server: Pick<ServerEnv, 'META_APP_ID' | 'META_APP_SECRET'>,
+): boolean {
+  return Boolean(server.META_APP_ID && server.META_APP_SECRET);
 }
 
 // Nexus capability flags — pure, also covered by tests. Each feature degrades when its key is absent.

@@ -60,6 +60,45 @@ export async function createConnection(
   return first;
 }
 
+export interface CreateOAuthConnectionInput {
+  accountId: string;
+  metaAdAccountId: string;
+  token: string; // long-lived user token vindo do fluxo OAuth (cifrado antes de gravar)
+  metaUserId: string;
+  tokenLabel?: string | undefined;
+  clientId?: string | undefined;
+}
+
+/**
+ * ADR 0038 — cria uma conexão vinda do OAuth oficial da Meta. Igual à manual em segurança (cifra o
+ * token, guarda só last4, nasce 'unverified'); difere no `connection_method` e no `oauth_meta_user_id`.
+ */
+export async function createOAuthConnection(
+  scope: AccountScope,
+  input: CreateOAuthConnectionInput,
+): Promise<ConnectionDisplay> {
+  if (!canManageAccount(scope, input.accountId)) {
+    throw new Error('forbidden: cannot manage this account');
+  }
+  const sealed = sealSecret(input.token, adTokenEncKey());
+  const row = {
+    account_id: input.accountId,
+    client_id: input.clientId ?? null,
+    meta_ad_account_id: input.metaAdAccountId,
+    connection_method: 'oauth_meta',
+    access_token_cipher: sealed.cipherHex,
+    access_token_last4: sealed.last4,
+    token_label: input.tokenLabel ?? null,
+    oauth_meta_user_id: input.metaUserId,
+    status: 'unverified',
+  };
+  const inserted = await insertRows('ad_account_connections', [row]);
+  const parsed = parseRows(connectionDisplaySchema, inserted);
+  const first = parsed[0];
+  if (!first) throw new Error('insert ad_account_connections returned no row');
+  return first;
+}
+
 async function getConnectionById(id: string): Promise<ConnectionDisplay | null> {
   const rows = await selectRows('ad_account_connections', {
     select: CONNECTION_DISPLAY_COLUMNS,

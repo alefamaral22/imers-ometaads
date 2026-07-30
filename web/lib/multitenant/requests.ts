@@ -30,6 +30,25 @@ export const updateConnectionSchema = z
   .refine((o) => Object.keys(o).length > 0, 'nada para atualizar');
 export type UpdateConnectionRequest = z.infer<typeof updateConnectionSchema>;
 
+/**
+ * ADR 0038 — conclusão do fluxo OAuth: o operador escolhe QUAIS contas de anúncio importar. O token
+ * não aparece aqui (vem do cookie de staging cifrado, server-side).
+ */
+export const finishOAuthConnectionSchema = z.object({
+  accountId: z.string().uuid(),
+  adAccountIds: z
+    .array(
+      z
+        .string()
+        .trim()
+        .regex(/^(act_)?\d{1,20}$/, 'meta ad account id inválido (use act_<digits> ou <digits>)'),
+    )
+    .min(1)
+    .max(50),
+  tokenLabel: z.string().trim().max(120).optional(),
+});
+export type FinishOAuthConnectionRequest = z.infer<typeof finishOAuthConnectionSchema>;
+
 export const upsertApiKeySchema = z.object({
   accountId: z.string().uuid(),
   provider: z.enum(['anthropic', 'openai', 'elevenlabs', 'minimax', 'other']),

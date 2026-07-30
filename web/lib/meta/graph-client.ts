@@ -1,18 +1,10 @@
 import 'server-only';
 import { z } from 'zod';
 
-export const META_GRAPH_API_VERSION = 'v21.0' as const;
-
-export class MetaGraphError extends Error {
-  constructor(
-    public readonly endpoint: string,
-    public readonly httpStatus: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'MetaGraphError';
-  }
-}
+// A versão da API e a classe de erro vivem em `graph-shared.ts` (sem `server-only`) para que módulos
+// puros/testáveis possam usá-las; reexportados aqui para não quebrar os imports existentes.
+export { META_GRAPH_API_VERSION, MetaGraphError } from './graph-shared';
+import { META_GRAPH_API_VERSION, MetaGraphError } from './graph-shared';
 
 const metaCampaignApiSchema = z.object({
   id: z.string(),
